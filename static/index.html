@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PC POP メーカー</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside class="panel">
+  <h1>PC POP メーカー</h1>
+
+  <section>
+    <label class="lbl" for="url">ドスパラ商品URL</label>
+    <div class="row">
+      <input id="url" type="url" placeholder="https://www.dospara.co.jp/TC30/MC25585-SN5037.html">
+      <button id="btnFetch" class="primary">取得</button>
+    </div>
+    <details id="pasteBox">
+      <summary>取得できない場合: ページのソースを貼り付け</summary>
+      <p class="hint">ブラウザで商品ページを開き、Ctrl+U →Ctrl+A →Ctrl+C で貼り付けてください。</p>
+      <textarea id="html" rows="5" placeholder="&lt;!DOCTYPE html&gt; ..."></textarea>
+      <button id="btnParse">貼り付けたHTMLを解析</button>
+    </details>
+    <div id="status" class="status"></div>
+  </section>
+
+  <div id="editor" hidden>
+    <section>
+      <h2>表示項目</h2>
+      <label><input type="checkbox" id="optEdition" checked> 同梱版などの付帯名</label>
+      <label><input type="checkbox" id="optCatch" checked> キャッチコピー</label>
+      <label><input type="checkbox" id="optLabels" checked> ラベル（キャンペーン）</label>
+      <label><input type="checkbox" id="optBench" checked> ベンチマーク</label>
+      <label><input type="checkbox" id="optInstall" checked> 分割払い</label>
+      <label><input type="checkbox" id="optStock" checked> 出荷目安</label>
+      <label><input type="checkbox" id="optShort"> スペックを短縮表記にする</label>
+    </section>
+
+    <section>
+      <h2>メイン画像</h2>
+      <div id="thumbs" class="thumbs"></div>
+    </section>
+
+    <section>
+      <h2>POPに載せるスペック</h2>
+      <p class="hint">チェックで表示切替。POP上の文字は直接クリックして編集できます。</p>
+      <div id="specToggles"></div>
+    </section>
+
+    <section>
+      <h2>取得データ確認（製品仕様［基本構成］全項目）</h2>
+      <table id="rawTable" class="raw"></table>
+    </section>
+
+    <section class="sticky">
+      <button id="btnPrint" class="primary wide">印刷 / PDF保存 (A4)</button>
+    </section>
+  </div>
+</aside>
+
+<main class="stage">
+  <div id="pop" class="pop empty">
+    <p class="placeholder">URLを入力して「取得」を押すとPOPが表示されます</p>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

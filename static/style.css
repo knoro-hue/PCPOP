@@ -1,0 +1,144 @@
+:root {
+  --navy: #0b1f3a;
+  --accent: #e43344;
+  --gold: #f2b705;
+  --blue: #004da1;
+  --line: #d6dbe3;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+  display: flex;
+  min-height: 100vh;
+  background: #e9ecf1;
+  color: #222;
+}
+
+/* ---------- control panel ---------- */
+.panel {
+  width: 380px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid var(--line);
+  padding: 16px;
+  height: 100vh;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+}
+.panel h1 { font-size: 18px; margin: 0 0 12px; }
+.panel h2 { font-size: 13px; margin: 0 0 8px; color: var(--blue); }
+.panel section { padding: 12px 0; border-bottom: 1px solid #eee; }
+.panel label { display: block; font-size: 13px; margin: 4px 0; }
+.lbl { font-weight: bold; }
+.row { display: flex; gap: 6px; }
+.row input { flex: 1; min-width: 0; }
+input[type=url], textarea {
+  width: 100%; padding: 7px 8px; border: 1px solid #bbb; border-radius: 4px; font-size: 13px;
+}
+textarea { margin: 6px 0; font-family: monospace; }
+button {
+  padding: 7px 12px; border: 1px solid #999; border-radius: 4px; background: #f6f6f6;
+  cursor: pointer; font-size: 13px;
+}
+button.primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: bold; }
+button.wide { width: 100%; padding: 10px; font-size: 15px; }
+button:disabled { opacity: .5; cursor: wait; }
+details { margin-top: 8px; font-size: 12px; }
+.hint { font-size: 11px; color: #666; margin: 4px 0; }
+.status { font-size: 12px; margin-top: 8px; white-space: pre-wrap; }
+.status.err { color: var(--accent); }
+.status.ok { color: #12813a; }
+.sticky { position: sticky; bottom: -16px; padding-bottom: 16px !important; background: #fff; border-bottom: 0 !important; z-index: 2; }
+
+.thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.thumbs img {
+  width: 100%; aspect-ratio: 1; object-fit: contain; background: #f4f4f4;
+  border: 2px solid transparent; border-radius: 4px; cursor: pointer;
+}
+.thumbs img.sel { border-color: var(--accent); }
+
+.spec-toggle { display: flex !important; align-items: flex-start; gap: 6px; }
+.spec-toggle small { color: #666; display: block; }
+
+table.raw { width: 100%; border-collapse: collapse; font-size: 11px; }
+table.raw th, table.raw td { border: 1px solid #ddd; padding: 3px 5px; vertical-align: top; text-align: left; }
+table.raw th { background: #f5f7fa; width: 34%; font-weight: normal; }
+table.raw td { white-space: pre-wrap; }
+
+/* ---------- stage / A4 POP ---------- */
+.stage { flex: 1; padding: 24px; display: flex; justify-content: center; overflow: auto; }
+.pop {
+  width: 210mm; height: 297mm; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.18);
+  position: relative; overflow: hidden; display: flex; flex-direction: column;
+}
+.pop.empty { align-items: center; justify-content: center; color: #999; }
+[contenteditable]:hover { outline: 1px dashed #9ab; }
+[contenteditable]:focus { outline: 2px solid var(--gold); }
+
+.pop-head {
+  background: var(--navy); color: #fff; padding: 7mm 10mm 6mm;
+  border-bottom: 2.5mm solid var(--gold);
+}
+.pop-head .top { display: flex; justify-content: space-between; align-items: center; }
+.pop-head .brand { font-size: 9mm; font-weight: 900; letter-spacing: .12em; }
+.pop-head .stock {
+  background: var(--accent); color: #fff; font-weight: bold; font-size: 5mm; padding: 1.2mm 4mm; border-radius: 1mm;
+}
+.pop-head .catch { margin-top: 2.5mm; font-size: 4.6mm; color: var(--gold); font-weight: bold; }
+.pop-head .model { margin-top: 2mm; font-size: 7.4mm; font-weight: 900; line-height: 1.25; }
+.pop-head .edition { margin-top: 1.5mm; font-size: 3.8mm; opacity: .9; }
+
+.pop-mid { display: flex; gap: 5mm; padding: 6mm 10mm 2mm; }
+.pop-mid .img { flex: 1; height: 82mm; display: flex; align-items: center; justify-content: center; }
+.pop-mid .img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.pop-mid .side { width: 64mm; display: flex; flex-direction: column; gap: 3mm; justify-content: center; }
+.bench {
+  border: 0.6mm solid var(--navy); border-radius: 2mm; text-align: center; padding: 3mm 2mm;
+}
+.bench .t { font-size: 3.4mm; font-weight: bold; color: var(--navy); }
+.bench .s { font-size: 11mm; font-weight: 900; color: var(--navy); line-height: 1.1; }
+.bench .stars { color: var(--gold); font-size: 5mm; letter-spacing: .1em; }
+.bench .sub { font-size: 2.8mm; color: #555; }
+.labels { display: flex; flex-direction: column; gap: 1.6mm; }
+.labels span {
+  background: #fff3f4; border: 0.4mm solid var(--accent); color: var(--accent);
+  font-size: 3.3mm; font-weight: bold; padding: 1.2mm 2mm; border-radius: 1mm;
+}
+
+.specs { margin: 2mm 10mm 0; border-top: 0.8mm solid var(--navy); flex: 1; overflow: hidden; }
+.specs .r { display: flex; border-bottom: 0.3mm solid var(--line); }
+.specs .k {
+  width: 30mm; flex-shrink: 0; background: #eef2f8; color: var(--navy); font-weight: bold;
+  font-size: 3.8mm; padding: 2mm 3mm; display: flex; align-items: center;
+}
+.specs .v { padding: 2mm 3mm; font-size: 4mm; line-height: 1.35; white-space: pre-line; }
+.specs .r.main .v { font-size: 5mm; font-weight: bold; }
+
+.pop-price {
+  margin: 4mm 10mm 0; display: flex; align-items: flex-end; justify-content: space-between;
+  border-top: 0.4mm dashed #999; padding-top: 3mm;
+}
+.pop-price .price { color: var(--accent); font-weight: 900; line-height: 1; }
+.pop-price .price .yen { font-size: 9mm; }
+.pop-price .price .num { font-size: 21mm; letter-spacing: -.02em; }
+.pop-price .price .tax { font-size: 4.5mm; color: #333; margin-left: 1mm; }
+.pop-price .inst { text-align: right; font-size: 4mm; color: #333; }
+.pop-price .inst b { font-size: 7mm; color: var(--navy); }
+
+.pop-foot {
+  margin-top: 3mm; padding: 2.5mm 10mm; background: #f2f4f7; font-size: 2.8mm; color: #555;
+  display: flex; justify-content: space-between;
+}
+
+@page { size: A4 portrait; margin: 0; }
+@media print {
+  body { background: #fff; display: block; }
+  .panel { display: none; }
+  .stage { padding: 0; display: block; }
+  .pop { box-shadow: none; }
+  [contenteditable]:hover, [contenteditable]:focus { outline: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
