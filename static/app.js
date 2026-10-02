@@ -51,7 +51,18 @@ async function load(path, body) {
   }
 }
 
-$("#btnFetch").onclick = () => load("/api/fetch", { url: $("#url").value });
+$("#btnFetch").onclick = () => {
+  const url = $("#url").value.trim();
+  // 商品ページは /TC30/MC25585-SN5037.html のような形。一覧・ランキングページはランキングPOPへ誘導
+  if (!/\/MC\d+(-SN\d+)?\.html/i.test(url)) {
+    const s = $("#status");
+    s.className = "status err";
+    s.innerHTML = "これは商品ページのURLではありません（例: …/TC30/MC25585-SN5037.html）。<br>" +
+      '/gamepc などのランキングから作る場合は <a href="/ranking.html">人気ランキングPOP</a> を使ってください。';
+    return;
+  }
+  load("/api/fetch", { url });
+};
 $("#url").addEventListener("keydown", (e) => e.key === "Enter" && $("#btnFetch").click());
 $("#btnParse").onclick = () => load("/api/parse", { html: $("#html").value, url: $("#url").value });
 $("#btnPrint").onclick = () => window.print();

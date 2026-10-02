@@ -76,6 +76,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, scraper.parse_product(src, req.get("url", "")))
         except scraper.FetchError as e:
             return self._json(502, {"error": str(e)})
+        except scraper.ParseError as e:
+            return self._json(422, {"error": str(e)})
         except Exception as e:  # noqa: BLE001
             return self._json(500, {"error": f"解析エラー: {e}"})
         self._json(404, {"error": "not found"})

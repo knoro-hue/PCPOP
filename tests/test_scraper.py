@@ -74,5 +74,29 @@ class TestRanking(unittest.TestCase):
         self.assertEqual([i["rank"] for i in items], [1, 2, 3])
 
 
+
+class TestErrors(unittest.TestCase):
+    def test_ranking_page_is_not_a_product(self):
+        src = (Path(__file__).parent / "fixtures" / "ranking_synthetic.html").read_text(encoding="utf-8")
+        with self.assertRaisesRegex(scraper.ParseError, "人気ランキングPOP"):
+            scraper.parse_product(src, "https://www.dospara.co.jp/gamepc")
+
+    def test_fetch_falls_back_to_powershell_on_windows(self):
+        from unittest import mock
+        with mock.patch.object(scraper, "_fetch_urllib", side_effect=TimeoutError("timed out")), \
+             mock.patch.object(scraper.os, "name", "nt"), \
+             mock.patch.object(scraper, "_fetch_powershell", return_value="<html>ok</html>") as ps:
+            self.assertEqual(scraper.fetch_html("https://www.dospara.co.jp/gamepc"), "<html>ok</html>")
+            ps.assert_called_once()
+
+    def test_fetch_error_lists_both_attempts(self):
+        from unittest import mock
+        with mock.patch.object(scraper, "_fetch_urllib", side_effect=TimeoutError("timed out")), \
+             mock.patch.object(scraper.os, "name", "nt"), \
+             mock.patch.object(scraper, "_fetch_powershell", side_effect=RuntimeError("407 Proxy")):
+            with self.assertRaisesRegex(scraper.FetchError, "直接接続: timed out.*Windowsプロキシ経由: 407"):
+                scraper.fetch_html("https://www.dospara.co.jp/gamepc")
+
+
 if __name__ == "__main__":
     unittest.main()

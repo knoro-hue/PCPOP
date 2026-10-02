@@ -12,7 +12,10 @@ from __future__ import annotations
 import gzip
 import html
 import json
+import os
 import re
+import subprocess
+import tempfile
 import urllib.request
 import zlib
 from html.parser import HTMLParser
@@ -31,10 +34,36 @@ class FetchError(Exception):
     pass
 
 
-def fetch_html(url: str, timeout: int = 20) -> str:
+class ParseError(Exception):
+    pass
+
+
+def fetch_html(url: str, timeout: int = 15) -> str:
+    """ページ取得。直接 (urllib) → 失敗時は Windows のシステムプロキシ経由 (PowerShell) の順に試す。
+
+    社内ネットワークでは PAC ファイルや認証付きプロキシ経由でしか外に出られないことがあり、
+    その場合 Python の urllib はタイムアウトする。ブラウザと同じ Windows のプロキシ設定を使う
+    PowerShell (WebClient + DefaultCredentials) で再取得する。
+    """
     host = urlparse(url).hostname or ""
     if host not in ALLOWED_HOSTS:
         raise FetchError(f"ドスパラのURLではありません: {host or url}")
+    errors = []
+    try:
+        return _fetch_urllib(url, timeout)
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"直接接続: {e}")
+    if os.name == "nt":
+        try:
+            src = _fetch_powershell(url, timeout * 3)
+            print("[pcpop] Windows のプロキシ設定経由で取得しました")
+            return src
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"Windowsプロキシ経由: {e}")
+    raise FetchError("ページを取得できませんでした（" + " / ".join(errors) + "）")
+
+
+def _fetch_urllib(url: str, timeout: int) -> str:
     req = urllib.request.Request(
         url,
         headers={
@@ -44,18 +73,54 @@ def fetch_html(url: str, timeout: int = 20) -> str:
             "Accept-Encoding": "gzip, deflate",
         },
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as res:
-            raw = res.read()
-            enc = (res.headers.get("Content-Encoding") or "").lower()
-            charset = res.headers.get_content_charset() or "utf-8"
-    except Exception as e:  # noqa: BLE001
-        raise FetchError(f"ページを取得できませんでした: {e}") from e
+    with urllib.request.urlopen(req, timeout=timeout) as res:
+        raw = res.read()
+        enc = (res.headers.get("Content-Encoding") or "").lower()
+        charset = res.headers.get_content_charset() or "utf-8"
     if enc == "gzip":
         raw = gzip.decompress(raw)
     elif enc == "deflate":
         raw = zlib.decompress(raw)
     return raw.decode(charset, errors="replace")
+
+
+_PS_SCRIPT = r"""
+$ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$wc = New-Object Net.WebClient
+$wc.Proxy = [Net.WebRequest]::GetSystemWebProxy()
+$wc.Proxy.Credentials = [Net.CredentialCache]::DefaultCredentials
+$wc.Headers.Add('User-Agent', $env:PCPOP_UA)
+$wc.Headers.Add('Accept-Language', 'ja,en;q=0.8')
+$wc.DownloadFile($env:PCPOP_URL, $env:PCPOP_OUT)
+"""
+
+
+def _fetch_powershell(url: str, timeout: int) -> str:
+    fd, out = tempfile.mkstemp(suffix=".html")
+    os.close(fd)
+    try:
+        env = dict(os.environ, PCPOP_URL=url, PCPOP_OUT=out, PCPOP_UA=UA)
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", _PS_SCRIPT],
+            env=env, capture_output=True, timeout=timeout,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        if r.returncode != 0:
+            raw = r.stderr or r.stdout or b""
+            try:
+                msg = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                msg = raw.decode("cp932", "replace")  # 日本語版 Windows の PowerShell 出力
+            msg = msg.strip()
+            raise RuntimeError(msg.splitlines()[0] if msg else f"exit {r.returncode}")
+        with open(out, "rb") as f:
+            return f.read().decode("utf-8", errors="replace")
+    finally:
+        try:
+            os.remove(out)
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------- helpers
@@ -272,6 +337,11 @@ def parse_product(src: str, url: str = "") -> dict:
     pj = parse_product_json(src)
     ld = parse_json_ld(src)
     table = parse_spec_table(src)
+    if not pj and not table:
+        hint = ""
+        if parse_ranking(src, url or BASE):
+            hint = "（ランキング/一覧ページのようです。「人気ランキングPOP」画面を使ってください）"
+        raise ParseError("商品ページのスペック情報が見つかりません" + hint)
     tmap = {r["label"]: r["value"] for r in table}
 
     name = (
