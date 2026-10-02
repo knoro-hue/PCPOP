@@ -177,25 +177,25 @@ def fetch_ranking_html(url: str) -> str:
         raise FetchError("ブラウザでの読み込みがタイムアウトしました") from e
 
 
-def _fetch_urllib(url: str, timeout: int) -> str:
+def _urllib_bytes(url: str, timeout: int, accept: str = "*/*") -> tuple[bytes, str | None]:
     req = urllib.request.Request(
         url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "ja,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate",
-        },
+        headers={"User-Agent": UA, "Accept": accept, "Accept-Language": "ja,en;q=0.8", "Accept-Encoding": "gzip, deflate"},
     )
     with urllib.request.urlopen(req, timeout=timeout) as res:
         raw = res.read()
         enc = (res.headers.get("Content-Encoding") or "").lower()
-        charset = res.headers.get_content_charset() or "utf-8"
+        charset = res.headers.get_content_charset()
     if enc == "gzip":
         raw = gzip.decompress(raw)
     elif enc == "deflate":
         raw = zlib.decompress(raw)
-    return raw.decode(charset, errors="replace")
+    return raw, charset
+
+
+def _fetch_urllib(url: str, timeout: int) -> str:
+    raw, charset = _urllib_bytes(url, timeout, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+    return raw.decode(charset or "utf-8", errors="replace")
 
 
 _PS_SCRIPT = r"""
@@ -210,7 +210,7 @@ $wc.DownloadFile($env:PCPOP_URL, $env:PCPOP_OUT)
 """
 
 
-def _fetch_powershell(url: str, timeout: int) -> str:
+def _powershell_bytes(url: str, timeout: int) -> bytes:
     fd, out = tempfile.mkstemp(suffix=".html")
     os.close(fd)
     try:
@@ -229,12 +229,48 @@ def _fetch_powershell(url: str, timeout: int) -> str:
             msg = msg.strip()
             raise RuntimeError(msg.splitlines()[0] if msg else f"exit {r.returncode}")
         with open(out, "rb") as f:
-            return f.read().decode("utf-8", errors="replace")
+            return f.read()
     finally:
         try:
             os.remove(out)
         except OSError:
             pass
+
+
+def _fetch_powershell(url: str, timeout: int) -> str:
+    return _powershell_bytes(url, timeout).decode("utf-8", errors="replace")
+
+
+_IMG_CACHE: dict[str, bytes] = {}
+
+
+def fetch_image(url: str) -> bytes:
+    """商品画像を取得 (ブラウザ側で白背景を透過処理するための中継用)。"""
+    global _DIRECT_OK
+    _check_host(url)
+    if url in _IMG_CACHE:
+        return _IMG_CACHE[url]
+    errors = []
+    data = None
+    if _DIRECT_OK is not False:
+        try:
+            data, _ = _urllib_bytes(url, 8)
+            _DIRECT_OK = True
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"直接接続: {e}")
+            if _DIRECT_OK is None:
+                _DIRECT_OK = False
+    if data is None and os.name == "nt":
+        try:
+            data = _powershell_bytes(url, 30)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"Windowsプロキシ経由: {e}")
+    if data is None:
+        raise FetchError("画像を取得できませんでした（" + " / ".join(errors) + "）")
+    if len(_IMG_CACHE) > 200:
+        _IMG_CACHE.clear()
+    _IMG_CACHE[url] = data
+    return data
 
 
 # ---------------------------------------------------------------- helpers

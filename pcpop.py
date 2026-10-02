@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import time
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import scraper
 
@@ -37,6 +39,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]
+        if path == "/api/img":
+            # 画像中継: ブラウザの canvas で白背景を透過するため同一オリジンで返す
+            q = parse_qs(urlparse(self.path).query)
+            url = (q.get("url") or [""])[0]
+            try:
+                data = scraper.fetch_image(url)
+            except scraper.FetchError as e:
+                return self._send(502, str(e).encode("utf-8"), "text/plain; charset=utf-8")
+            ctype = mimetypes.guess_type(urlparse(url).path)[0] or "application/octet-stream"
+            return self._send(200, data, ctype)
         if path == "/":
             path = "/index.html"
         f = (STATIC / path.lstrip("/")).resolve()

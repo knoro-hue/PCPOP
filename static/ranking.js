@@ -73,7 +73,7 @@ const THEMES = {
 const DEFAULT_THEME = ["game", "stream", "creative"];
 
 /* ------------------------------------------------------------ state */
-const slots = [0, 1, 2].map((i) => ({ i, url: "", rank: null, cand: null, theme: DEFAULT_THEME[i], data: null, caseImg: "", sceneImg: "", descMode: "catch" }));
+const slots = [0, 1, 2].map((i) => ({ i, url: "", rank: null, cand: null, theme: DEFAULT_THEME[i], data: null, caseImg: "", sceneImg: "", descMode: "catch", sceneFit: "contain", cutout: true }));
 
 function specValue(d, label, detailed) {
   const s = d.keySpecs.find((x) => x.label === label);
@@ -101,6 +101,17 @@ function buildSlotPanel(s) {
   const descSel = el("select");
   descSel.append(el("option", { value: "catch", text: "説明: 商品キャッチコピー" }), el("option", { value: "theme", text: "説明: テーマ文" }));
   descSel.onchange = () => { s.descMode = descSel.value; renderCard(s); };
+
+  const fitSel = el("select");
+  fitSel.append(
+    el("option", { value: "contain", text: "右画像: 全体表示（切れない）" }),
+    el("option", { value: "width", text: "右画像: 横幅に合わせる" }),
+    el("option", { value: "height", text: "右画像: 縦幅に合わせる" }));
+  fitSel.onchange = () => { s.sceneFit = fitSel.value; renderCard(s); };
+
+  const cut = el("input", { type: "checkbox" });
+  cut.checked = s.cutout;
+  cut.onchange = () => { s.cutout = cut.checked; renderCard(s); };
 
   const url = el("input", { type: "url", placeholder: `枠${s.i + 1} の商品URL` });
   const btn = el("button", { text: "取得" });
@@ -144,7 +155,8 @@ function buildSlotPanel(s) {
     el("div", { class: "row" }, url, btn),
     status,
     el("details", {}, el("summary", { text: "取得できない場合: ソース貼り付け" }), paste, pbtn),
-    el("div", { class: "row", style: "margin-top:6px" }, descSel),
+    el("div", { class: "row", style: "margin-top:6px;flex-wrap:wrap" }, descSel, fitSel),
+    el("label", {}, cut, " PC画像の白背景を透過する"),
     el("div", { class: "imgs" }),
   );
   return box;
@@ -169,6 +181,62 @@ function renderThumbs(s, box) {
   };
   group("左：PC本体画像", "caseImg");
   group("右：イメージ画像（ゲーム画面などをアップロードも可）", "sceneImg");
+}
+
+/* ------------------------------------------------------------ PC画像の白背景透過 */
+const cutoutCache = new Map();
+
+// 画像の外周から繋がっている白っぽい領域を透明にする (元から透過PNGならそのまま)
+async function cutoutWhite(src) {
+  if (cutoutCache.has(src)) return cutoutCache.get(src);
+  const p = (async () => {
+    const proxied = /^https?:/.test(src) ? "/api/img?url=" + encodeURIComponent(src) : src;
+    const img = new Image();
+    img.src = proxied;
+    await img.decode();
+    const scale = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    const id = ctx.getImageData(0, 0, w, h), d = id.data;
+    const at = (x, y) => (y * w + x) * 4;
+    const corners = [at(0, 0), at(w - 1, 0), at(0, h - 1), at(w - 1, h - 1)];
+    if (corners.some((i) => d[i + 3] < 30)) return proxied; // 既に透過
+    const whiteish = (i) => d[i + 3] > 0 && Math.min(d[i], d[i + 1], d[i + 2]) > 226 && Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) < 22;
+    if (!corners.every(whiteish)) return proxied; // 白背景ではない
+    const seen = new Uint8Array(w * h), stack = [];
+    for (let x = 0; x < w; x++) stack.push(x, 0, x, h - 1);
+    for (let y = 0; y < h; y++) stack.push(0, y, w - 1, y);
+    while (stack.length) {
+      const y = stack.pop(), x = stack.pop();
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const k = y * w + x;
+      if (seen[k]) continue;
+      seen[k] = 1;
+      const i = k * 4;
+      if (!whiteish(i)) continue;
+      // 白に近いほど透明、境界付近は半透明にして縁をなめらかに
+      const m = Math.min(d[i], d[i + 1], d[i + 2]);
+      d[i + 3] = m >= 245 ? 0 : Math.round(d[i + 3] * (245 - m) / 19);
+      stack.push(x + 1, y, x - 1, y, x, y + 1, x, y - 1);
+    }
+    ctx.putImageData(id, 0, 0);
+    return cv.toDataURL("image/png");
+  })().catch(() => src);
+  cutoutCache.set(src, p);
+  return p;
+}
+
+function caseImgEl(s) {
+  if (!s.caseImg) return null;
+  const img = el("img", { src: s.caseImg, alt: "" });
+  if (s.cutout) {
+    img.style.visibility = "hidden";
+    cutoutWhite(s.caseImg).then((u) => { img.src = u; img.style.visibility = ""; });
+  }
+  return img;
 }
 
 /* ------------------------------------------------------------ POP card */
@@ -206,13 +274,15 @@ function renderCard(s) {
   const side = el("div", { class: "card-side" },
     el("div", { class: "rank-badge" },
       el("span", { class: "crown", text: "♛" }), el("span", { class: "a", text: "人気" }), ed("span", "b", `No.${s.rank ?? s.i + 1}`)),
-    el("div", { class: "card-scene" }, s.sceneImg ? el("img", { src: s.sceneImg, alt: "" }) : null, price),
+    el("div", { class: `card-scene fit-${s.sceneFit}` },
+      s.sceneImg ? el("div", { class: "bg", style: `background-image:url("${s.sceneImg}")` }) : null,
+      s.sceneImg ? el("img", { src: s.sceneImg, alt: "" }) : null),
     el("div", { class: "card-chips" },
       ed("span", "h", th.chipsTitle),
       el("div", { class: "chips" }, ...th.chips.map(([ic, t]) => el("div", { class: "chip" }, svg(ic), ed("div", "", t))))));
 
   card.append(tab, el("div", { class: "card-body" },
-    el("div", { class: "card-case" }, s.caseImg ? el("img", { src: s.caseImg, alt: "" }) : null),
+    el("div", { class: "card-case" }, el("div", { class: "stage-floor" }), el("div", { class: "case-img" }, caseImgEl(s)), price),
     info, side));
 }
 
