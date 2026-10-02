@@ -62,6 +62,14 @@ class Handler(BaseHTTPRequestHandler):
                 url = (req.get("url") or "").strip()
                 src = scraper.fetch_html(url)
                 return self._json(200, scraper.parse_product(src, url))
+            if self.path == "/api/ranking":
+                # カテゴリページ (例: /gamepc) のランキング上位URLを返す
+                url = (req.get("url") or "").strip()
+                src = req.get("html") or scraper.fetch_html(url)
+                items = scraper.parse_ranking(src, url or scraper.BASE, int(req.get("limit") or 3))
+                if not items:
+                    return self._json(422, {"error": "ランキングの商品リンクが見つかりませんでした"})
+                return self._json(200, {"items": items})
             if self.path == "/api/parse":
                 # 取得がブロックされた時用: ブラウザで「ページのソース」を貼り付け
                 src = req.get("html") or ""

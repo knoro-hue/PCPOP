@@ -363,6 +363,48 @@ def _warnings(pj, table, price) -> list[str]:
     return w
 
 
+
+# ---------------------------------------------------------------- ranking
+
+# 商品ページへのリンク: /TC30/MC25585-SN5037.html, /TC30/MC25585.html など
+_PRODUCT_HREF = re.compile(
+    r'<a\b[^>]*?href="((?:https?://(?:www\.)?dospara\.co\.jp)?/[\w-]+/(MC\d+)(?:-SN\d+)?\.html)[^"]*"[^>]*>(.*?)</a>',
+    re.S | re.I,
+)
+_RANK_HEAD = re.compile(r"<(h[1-4]|p|div|span)[^>]*>[^<]{0,40}ランキング", re.S)
+
+
+def _ranking_region(src: str) -> str:
+    """ランキング見出し以降を返す (ヘッダーのナビゲーションを除外するため)。"""
+    body = src
+    main = re.search(r'<div role="main"|id="maincontent"', src)
+    if main:
+        body = src[main.start():]
+    m = _RANK_HEAD.search(body)
+    if m:
+        return body[m.start():]
+    i = body.find("ランキング")
+    return body[i:] if i >= 0 else body
+
+
+def parse_ranking(src: str, base_url: str = BASE, limit: int = 3) -> list[dict]:
+    """カテゴリページ (例: /gamepc) のランキングから上位の商品URLを順に返す。"""
+    region = _ranking_region(src)
+    items: dict[str, dict] = {}
+    for href, mc, inner in _PRODUCT_HREF.findall(region):
+        text = _text(inner)
+        alt = _first(r'alt="([^"]*)"', inner) or ""
+        name = text if len(text) >= len(alt) else html.unescape(alt)
+        it = items.get(mc)
+        if it is None:
+            if len(items) >= limit:
+                break
+            items[mc] = {"rank": len(items) + 1, "url": urljoin(base_url, html.unescape(href)), "name": name}
+        elif len(name) > len(it["name"]):
+            it["name"] = name
+    return list(items.values())
+
+
 if __name__ == "__main__":
     import sys
 

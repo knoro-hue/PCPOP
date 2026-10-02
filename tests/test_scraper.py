@@ -60,5 +60,19 @@ class TestDosparaParse(unittest.TestCase):
             scraper.fetch_html("https://example.com/")
 
 
+
+class TestRanking(unittest.TestCase):
+    def test_top3_in_order(self):
+        src = (Path(__file__).parent / "fixtures" / "ranking_synthetic.html").read_text(encoding="utf-8")
+        items = scraper.parse_ranking(src, "https://www.dospara.co.jp/gamepc")
+        self.assertEqual([i["url"] for i in items], [
+            "https://www.dospara.co.jp/TC30/MC25585-SN5037.html",
+            "https://www.dospara.co.jp/TC30/MC20000.html",
+            "https://www.dospara.co.jp/TC143/MC30000-SN1.html",
+        ])
+        self.assertEqual(items[0]["name"], "GALLERIA XPR7A-R57-GD Ryzen 7 7700")
+        self.assertEqual([i["rank"] for i in items], [1, 2, 3])
+
+
 if __name__ == "__main__":
     unittest.main()
