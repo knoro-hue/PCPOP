@@ -11,6 +11,7 @@ python pcpop.py
 ```
 Windows ならエクスプローラーで `start.bat` をダブルクリックでも OK。
 ブラウザで http://127.0.0.1:8765/ が開きます。
+ポート 8765 が使えない環境（WinError 10013 など）では 8080 → 8000 → 18765 → 28765 → 空きポートの順に自動で切り替わり、実際のURLが表示されます。`python pcpop.py --port 9000` のように指定も可能です。
 
 ## 使い方
 1. 商品 URL（例: `https://www.dospara.co.jp/TC30/MC25585-SN5037.html`）を入れて「取得」

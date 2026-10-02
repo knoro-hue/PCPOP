@@ -81,13 +81,26 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
 
+def _bind(port: int) -> ThreadingHTTPServer:
+    """指定ポートが使えない場合 (Windows の予約ポート WinError 10013 / 使用中など) は別ポートを試す。"""
+    candidates = [port, 8080, 8000, 18765, 28765, 0]  # 0 = OS に空きポートを選ばせる
+    last = None
+    for p in dict.fromkeys(candidates):
+        try:
+            return ThreadingHTTPServer(("127.0.0.1", p), Handler)
+        except OSError as e:
+            print(f"[pcpop] ポート {p} は使用できません: {e}")
+            last = e
+    raise SystemExit(f"起動できませんでした: {last}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
-    url = f"http://127.0.0.1:{a.port}/"
+    srv = _bind(a.port)
+    url = f"http://127.0.0.1:{srv.server_address[1]}/"
     print(f"PC POP ツール起動: {url}  (終了: Ctrl+C)")
     if not a.no_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
