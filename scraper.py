@@ -14,8 +14,11 @@ import html
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
+import threading
+import time
 import urllib.request
 import zlib
 from html.parser import HTMLParser
@@ -38,29 +41,140 @@ class ParseError(Exception):
     pass
 
 
-def fetch_html(url: str, timeout: int = 15) -> str:
-    """ページ取得。直接 (urllib) → 失敗時は Windows のシステムプロキシ経由 (PowerShell) の順に試す。
+# 取得結果のキャッシュ (同じページを何度も取りに行かない)
+_CACHE: dict[str, tuple[float, str]] = {}
+_CACHE_TTL = 300
+_CACHE_LOCK = threading.Lock()
+# 直接接続が使えない環境 (社内プロキシ等) では、2回目以降は直接接続を試さずに済ませる
+_DIRECT_OK: bool | None = None
 
-    社内ネットワークでは PAC ファイルや認証付きプロキシ経由でしか外に出られないことがあり、
-    その場合 Python の urllib はタイムアウトする。ブラウザと同じ Windows のプロキシ設定を使う
-    PowerShell (WebClient + DefaultCredentials) で再取得する。
-    """
+
+def _check_host(url: str):
     host = urlparse(url).hostname or ""
     if host not in ALLOWED_HOSTS:
         raise FetchError(f"ドスパラのURLではありません: {host or url}")
+
+
+def _cached(key: str):
+    with _CACHE_LOCK:
+        hit = _CACHE.get(key)
+        if hit and time.time() - hit[0] < _CACHE_TTL:
+            return hit[1]
+    return None
+
+
+def _store(key: str, src: str) -> str:
+    with _CACHE_LOCK:
+        _CACHE[key] = (time.time(), src)
+    return src
+
+
+def fetch_html(url: str, timeout: int = 8) -> str:
+    """ページの HTML (サーバーが返すそのもの) を取得。
+
+    直接接続 → Windows のシステムプロキシ経由 (PowerShell) → ヘッドレスブラウザ の順に試す。
+    一度失敗した直接接続は以降スキップするので、社内ネットワークでも2回目からは待たされない。
+    """
+    global _DIRECT_OK
+    _check_host(url)
+    hit = _cached("raw:" + url)
+    if hit is not None:
+        return hit
     errors = []
-    try:
-        return _fetch_urllib(url, timeout)
-    except Exception as e:  # noqa: BLE001
-        errors.append(f"直接接続: {e}")
+    if _DIRECT_OK is not False:
+        try:
+            src = _fetch_urllib(url, timeout)
+            _DIRECT_OK = True
+            return _store("raw:" + url, src)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"直接接続: {e}")
+            if _DIRECT_OK is None:
+                _DIRECT_OK = False
     if os.name == "nt":
         try:
-            src = _fetch_powershell(url, timeout * 3)
-            print("[pcpop] Windows のプロキシ設定経由で取得しました")
-            return src
+            src = _fetch_powershell(url, 45)
+            return _store("raw:" + url, src)
         except Exception as e:  # noqa: BLE001
             errors.append(f"Windowsプロキシ経由: {e}")
+    try:
+        return _store("raw:" + url, render_html(url, budget_ms=3000))
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"ブラウザ経由: {e}")
     raise FetchError("ページを取得できませんでした（" + " / ".join(errors) + "）")
+
+
+# ---------------------------------------------------------------- headless browser
+
+def find_browser() -> str | None:
+    """PC にインストール済みの Edge / Chrome を探す (追加インストール不要)。"""
+    env = os.environ.get("PCPOP_BROWSER")
+    if env and os.path.exists(env):
+        return env
+    cands = []
+    for base in (os.environ.get("PROGRAMFILES(X86)"), os.environ.get("PROGRAMFILES"), os.environ.get("LOCALAPPDATA")):
+        if base:
+            cands += [
+                os.path.join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
+                os.path.join(base, "Google", "Chrome", "Application", "chrome.exe"),
+            ]
+    cands += [
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    ]
+    for c in cands:
+        if os.path.exists(c):
+            return c
+    for name in ("msedge", "microsoft-edge", "google-chrome", "chromium", "chromium-browser", "chrome"):
+        p = shutil.which(name)
+        if p:
+            return p
+    return None
+
+
+_BROWSER_LOCK = threading.Lock()
+
+
+def render_html(url: str, budget_ms: int = 8000, timeout: int = 60, _allow_any_host: bool = False) -> str:
+    """ヘッドレスの Edge/Chrome でページを開き、JavaScript 実行後の HTML を返す。
+
+    ランキングのように JavaScript で後から表示される部分を取るために使う。
+    ブラウザは Windows のプロキシ設定をそのまま使うので社内ネットワークでも通る。
+    """
+    if not _allow_any_host:
+        _check_host(url)
+    key = f"dom{budget_ms}:" + url
+    hit = _cached(key)
+    if hit is not None:
+        return hit
+    exe = find_browser()
+    if not exe:
+        raise FetchError("Edge / Chrome が見つかりません（環境変数 PCPOP_BROWSER で場所を指定できます）")
+    # 普段使いのブラウザと干渉しないよう専用プロファイル (キャッシュが効くので2回目以降は速い)
+    profile = os.path.join(tempfile.gettempdir(), "pcpop-browser-profile")
+    cmd = [
+        exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+        "--disable-extensions", "--mute-audio", f"--user-data-dir={profile}",
+        f"--user-agent={UA}", "--blink-settings=imagesEnabled=false",
+        f"--virtual-time-budget={budget_ms}", "--dump-dom", url,
+    ]
+    if os.name != "nt" and hasattr(os, "geteuid") and os.geteuid() == 0:
+        cmd.insert(1, "--no-sandbox")
+    with _BROWSER_LOCK:  # 同じプロファイルを同時に使わない
+        r = subprocess.run(cmd, capture_output=True, timeout=timeout,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    out = r.stdout.decode("utf-8", errors="replace")
+    if "<html" not in out.lower():
+        err = r.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        raise FetchError("ブラウザでページを開けませんでした" + (f": {err[-1]}" if err else ""))
+    return _store(key, out)
+
+
+def fetch_ranking_html(url: str) -> str:
+    """ランキング (JavaScript で描画) を含む HTML を取得。"""
+    try:
+        return render_html(url)
+    except subprocess.TimeoutExpired as e:
+        raise FetchError("ブラウザでの読み込みがタイムアウトしました") from e
 
 
 def _fetch_urllib(url: str, timeout: int) -> str:

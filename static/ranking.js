@@ -302,12 +302,13 @@ async function applyPicked() {
     s.setUrl(c ? c.url : "");
     if (!c) { s.data = null; renderCard(s); }
   });
-  for (const s of slots) if (s.cand) await s.load();
+  // 3商品を並列で取得 (サーバー側も並列処理)
+  await Promise.all(slots.filter((s) => s.cand).map((s) => s.load()));
 }
 
 async function loadRanking(body) {
   const st = $("#rankStatus");
-  st.className = "status"; st.textContent = "ランキング取得中…";
+  st.className = "status"; st.textContent = "ランキング取得中…（ブラウザでページを実行しています）";
   try {
     const { items } = await call("/api/ranking", body);
     candidates = items;

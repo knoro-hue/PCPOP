@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -65,7 +66,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/ranking":
                 # カテゴリページ (例: /gamepc) のランキングを全件返す
                 url = (req.get("url") or "").strip()
-                src = req.get("html") or scraper.fetch_html(url)
+                # ランキングは JavaScript で描画されるため、ヘッドレスブラウザで実行後の HTML を読む
+                src = req.get("html") or scraper.fetch_ranking_html(url)
                 items = scraper.parse_ranking(src, url or scraper.BASE)
                 if not items:
                     return self._json(422, {"error": "ランキング（ul.model-card-list.--ranking）が見つかりませんでした"})
