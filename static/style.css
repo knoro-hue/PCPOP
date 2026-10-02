@@ -142,3 +142,13 @@ table.raw td { white-space: pre-wrap; }
   [contenteditable]:hover, [contenteditable]:focus { outline: none; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---------- tabs ---------- */
+.tabs { display: flex; margin: -16px -16px 12px; border-bottom: 2px solid var(--blue); background: #f2f5fa; }
+.tabs a {
+  flex: 1; text-align: center; padding: 11px 6px; font-size: 13px; font-weight: bold;
+  color: #556; text-decoration: none; border-right: 1px solid #dde3ec;
+}
+.tabs a:last-child { border-right: 0; }
+.tabs a.on { background: var(--blue); color: #fff; }
+.tabs a:not(.on):hover { background: #e6edf8; }

@@ -63,12 +63,12 @@ class Handler(BaseHTTPRequestHandler):
                 src = scraper.fetch_html(url)
                 return self._json(200, scraper.parse_product(src, url))
             if self.path == "/api/ranking":
-                # カテゴリページ (例: /gamepc) のランキング上位URLを返す
+                # カテゴリページ (例: /gamepc) のランキングを全件返す
                 url = (req.get("url") or "").strip()
                 src = req.get("html") or scraper.fetch_html(url)
-                items = scraper.parse_ranking(src, url or scraper.BASE, int(req.get("limit") or 3))
+                items = scraper.parse_ranking(src, url or scraper.BASE)
                 if not items:
-                    return self._json(422, {"error": "ランキングの商品リンクが見つかりませんでした"})
+                    return self._json(422, {"error": "ランキング（ul.model-card-list.--ranking）が見つかりませんでした"})
                 return self._json(200, {"items": items})
             if self.path == "/api/parse":
                 # 取得がブロックされた時用: ブラウザで「ページのソース」を貼り付け

@@ -339,7 +339,7 @@ def parse_product(src: str, url: str = "") -> dict:
     table = parse_spec_table(src)
     if not pj and not table:
         hint = ""
-        if parse_ranking(src, url or BASE):
+        if _RANK_UL.search(src):
             hint = "（ランキング/一覧ページのようです。「人気ランキングPOP」画面を使ってください）"
         raise ParseError("商品ページのスペック情報が見つかりません" + hint)
     tmap = {r["label"]: r["value"] for r in table}
@@ -436,43 +436,64 @@ def _warnings(pj, table, price) -> list[str]:
 
 # ---------------------------------------------------------------- ranking
 
-# 商品ページへのリンク: /TC30/MC25585-SN5037.html, /TC30/MC25585.html など
-_PRODUCT_HREF = re.compile(
-    r'<a\b[^>]*?href="((?:https?://(?:www\.)?dospara\.co\.jp)?/[\w-]+/(MC\d+)(?:-SN\d+)?\.html)[^"]*"[^>]*>(.*?)</a>',
-    re.S | re.I,
-)
-_RANK_HEAD = re.compile(r"<(h[1-4]|p|div|span)[^>]*>[^<]{0,40}ランキング", re.S)
+class RankingNotRendered(ParseError):
+    """ランキング枠はあるが、中身が JavaScript で後から描画されるため空のケース。"""
 
 
-def _ranking_region(src: str) -> str:
-    """ランキング見出し以降を返す (ヘッダーのナビゲーションを除外するため)。"""
-    body = src
-    main = re.search(r'<div role="main"|id="maincontent"', src)
-    if main:
-        body = src[main.start():]
-    m = _RANK_HEAD.search(body)
-    if m:
-        return body[m.start():]
-    i = body.find("ランキング")
-    return body[i:] if i >= 0 else body
+_RANK_UL = re.compile(r'<ul\b[^>]*class="[^"]*\bmodel-card-list\b[^"]*--ranking[^"]*"[^>]*>', re.I)
+_RANK_LI = re.compile(r'<li\b[^>]*\bdata-ranking="(\d+)"[^>]*>', re.I)
+_MC_URL = re.compile(r"/(MC\d+)(?:-SN\d+)?\.html", re.I)
 
 
-def parse_ranking(src: str, base_url: str = BASE, limit: int = 3) -> list[dict]:
-    """カテゴリページ (例: /gamepc) のランキングから上位の商品URLを順に返す。"""
-    region = _ranking_region(src)
-    items: dict[str, dict] = {}
-    for href, mc, inner in _PRODUCT_HREF.findall(region):
-        text = _text(inner)
-        alt = _first(r'alt="([^"]*)"', inner) or ""
-        name = text if len(text) >= len(alt) else html.unescape(alt)
-        it = items.get(mc)
-        if it is None:
-            if len(items) >= limit:
-                break
-            items[mc] = {"rank": len(items) + 1, "url": urljoin(base_url, html.unescape(href)), "name": name}
-        elif len(name) > len(it["name"]):
-            it["name"] = name
-    return list(items.values())
+def _by_key(chunk: str, key: str) -> str:
+    """data-key="xxx" を持つ要素のテキスト (ドスパラ一覧の共通マークアップ)。"""
+    v = _first(rf'<(?:p|span|div)[^>]*data-key="{key}"[^>]*>(.*?)</(?:p|span|div)>', chunk)
+    return _text(v) if v else ""
+
+
+def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> list[dict]:
+    """カテゴリページ (例: /gamepc) のランキング `ul.model-card-list.--ranking` を全件返す。
+
+    各 `li[data-ranking]` から 商品URL・名前・画像・価格・出荷目安・主要スペック・訴求タグ を取得。
+    """
+    src = re.sub(r"<!--.*?-->", "", src, flags=re.S)  # コメントアウトされたタグを除外
+    m = _RANK_UL.search(src)
+    if not m:
+        return []
+    body = src[m.end():]
+    lis = list(_RANK_LI.finditer(body))
+    items = []
+    for i, li in enumerate(lis):
+        end = lis[i + 1].start() if i + 1 < len(lis) else len(body)
+        chunk = body[li.end():end]
+        href = _first(r'<a\b[^>]*\bhref="([^"]+)"', chunk) or ""
+        href = html.unescape(href)
+        if not _MC_URL.search(href):
+            continue  # 未描画のテンプレート (href 空など)
+        img = _first(r'<img\b[^>]*\bsrc="([^"]+)"[^>]*data-key="primeimgurl"', chunk) or _first(
+            r'<img\b[^>]*data-key="primeimgurl"[^>]*\bsrc="([^"]+)"', chunk) or _first(r'<img\b[^>]*\bsrc="([^"]+)"', chunk)
+        monthly = _first(r'data-format="\{installmentAmt\}"[^>]*>([\d,]+)<', chunk)
+        count = _first(r'data-format="\{installment\}回"[^>]*>(\d+)回<', chunk)
+        items.append({
+            "rank": int(li.group(1)),
+            "url": urljoin(base_url, href),
+            "name": _by_key(chunk, "primename"),
+            "image": html.unescape(img) if img else "",
+            "price": _to_int(_by_key(chunk, "amttaxnounit")),
+            "stock": _by_key(chunk, "stkname"),
+            "os": _by_key(chunk, "os"),
+            "cpu": _by_key(chunk, "cpu"),
+            "video": _by_key(chunk, "video"),
+            "tags": [_text(t) for t in re.findall(r'<p class="tag-appeal">(.*?)</p>', chunk, re.S) if _text(t)],
+            "installment": {"monthly": _to_int(monthly), "count": _to_int(count)} if monthly else None,
+        })
+    if not items:
+        raise RankingNotRendered(
+            "ランキング枠は見つかりましたが中身が空です（ブラウザ上でJavaScriptが表示する仕組みのため）。"
+            "「ランキングを貼り付け」の手順でコピーしたHTMLを貼ってください。"
+        )
+    items.sort(key=lambda x: x["rank"])
+    return items[:limit] if limit else items
 
 
 if __name__ == "__main__":

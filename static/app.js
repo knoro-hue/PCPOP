@@ -58,7 +58,7 @@ $("#btnFetch").onclick = () => {
     const s = $("#status");
     s.className = "status err";
     s.innerHTML = "これは商品ページのURLではありません（例: …/TC30/MC25585-SN5037.html）。<br>" +
-      '/gamepc などのランキングから作る場合は <a href="/ranking.html">人気ランキングPOP</a> を使ってください。';
+      '/gamepc などのランキングから作る場合は <a href="/">人気ランキングPOP</a> を使ってください。';
     return;
   }
   load("/api/fetch", { url });

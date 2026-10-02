@@ -62,22 +62,48 @@ class TestDosparaParse(unittest.TestCase):
 
 
 class TestRanking(unittest.TestCase):
-    def test_top3_in_order(self):
-        src = (Path(__file__).parent / "fixtures" / "ranking_synthetic.html").read_text(encoding="utf-8")
-        items = scraper.parse_ranking(src, "https://www.dospara.co.jp/gamepc")
-        self.assertEqual([i["url"] for i in items], [
-            "https://www.dospara.co.jp/TC30/MC25585-SN5037.html",
-            "https://www.dospara.co.jp/TC30/MC20000.html",
-            "https://www.dospara.co.jp/TC143/MC30000-SN1.html",
-        ])
-        self.assertEqual(items[0]["name"], "GALLERIA XPR7A-R57-GD Ryzen 7 7700")
-        self.assertEqual([i["rank"] for i in items], [1, 2, 3])
+    """実ページ /gamepc のランキング部分 (ブラウザ描画後) で検証。"""
 
+    @classmethod
+    def setUpClass(cls):
+        src = (Path(__file__).parent / "fixtures" / "gamepc_ranking.html").read_text(encoding="utf-8")
+        cls.items = scraper.parse_ranking(src, "https://www.dospara.co.jp/gamepc")
+
+    def test_all_items_in_rank_order(self):
+        self.assertEqual([i["rank"] for i in self.items], [1, 2, 3, 4])
+        self.assertEqual([i["url"] for i in self.items], [
+            "https://www.dospara.co.jp/TC30/MC25585-SN5037.html",
+            "https://www.dospara.co.jp/TC30/MC25617-SN4914.html",
+            "https://www.dospara.co.jp/TC30/MC25629-SN4995.html",
+            "https://www.dospara.co.jp/TC30/MC23019-SN4776.html",
+        ])
+
+    def test_item_fields(self):
+        it = self.items[1]
+        self.assertTrue(it["name"].startswith("GALLERIA XGR5M-R56T8G-GD Ryzen 5 7500F"))
+        self.assertEqual((it["price"], it["stock"], it["cpu"], it["video"], it["os"]),
+                         (221080, "翌日出荷", "Ryzen 5 7500F", "GeForce RTX 5060 Ti 8GB", "Windows 11 Home"))
+        self.assertEqual(it["installment"], {"monthly": 6200, "count": 36})
+        self.assertEqual(it["tags"], ["32GBメモリへの変更が半額", "2TB HDD追加が半額"])
+        self.assertIn("case_gem-gd_main.png", it["image"])
+
+    def test_commented_out_tags_are_ignored(self):
+        self.assertEqual(self.items[3]["tags"], [])
+        self.assertEqual(self.items[3]["price"], 524980)
+
+    def test_unrendered_template_raises(self):
+        src = '<ul class="model-card-list --ranking get_ranking_data" data-categoryname="TC30">' \
+              '<li data-ranking="1"><a class="model-card" href="" data-key="primeurl"></a></li></ul>'
+        with self.assertRaises(scraper.RankingNotRendered):
+            scraper.parse_ranking(src)
+
+    def test_no_ranking_block(self):
+        self.assertEqual(scraper.parse_ranking('<a href="/TC30/MC1.html">x</a>'), [])
 
 
 class TestErrors(unittest.TestCase):
     def test_ranking_page_is_not_a_product(self):
-        src = (Path(__file__).parent / "fixtures" / "ranking_synthetic.html").read_text(encoding="utf-8")
+        src = (Path(__file__).parent / "fixtures" / "gamepc_ranking.html").read_text(encoding="utf-8")
         with self.assertRaisesRegex(scraper.ParseError, "人気ランキングPOP"):
             scraper.parse_product(src, "https://www.dospara.co.jp/gamepc")
 

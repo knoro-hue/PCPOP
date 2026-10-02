@@ -73,7 +73,7 @@ const THEMES = {
 const DEFAULT_THEME = ["game", "stream", "creative"];
 
 /* ------------------------------------------------------------ state */
-const slots = [0, 1, 2].map((i) => ({ i, url: "", theme: DEFAULT_THEME[i], data: null, caseImg: "", sceneImg: "", descMode: "catch" }));
+const slots = [0, 1, 2].map((i) => ({ i, url: "", rank: null, cand: null, theme: DEFAULT_THEME[i], data: null, caseImg: "", sceneImg: "", descMode: "catch" }));
 
 function specValue(d, label, detailed) {
   const s = d.keySpecs.find((x) => x.label === label);
@@ -102,7 +102,7 @@ function buildSlotPanel(s) {
   descSel.append(el("option", { value: "catch", text: "説明: 商品キャッチコピー" }), el("option", { value: "theme", text: "説明: テーマ文" }));
   descSel.onchange = () => { s.descMode = descSel.value; renderCard(s); };
 
-  const url = el("input", { type: "url", placeholder: `${s.i + 1}位の商品URL` });
+  const url = el("input", { type: "url", placeholder: `枠${s.i + 1} の商品URL` });
   const btn = el("button", { text: "取得" });
   const status = el("div", { class: "status" });
   const paste = el("textarea", { rows: "3", placeholder: "商品ページのソース (Ctrl+U)" });
@@ -124,6 +124,14 @@ function buildSlotPanel(s) {
       status.className = "status err";
       status.textContent = "エラー: " + e.message;
       box.querySelector("details").open = true;
+      // 商品ページが取れなくても、ランキング一覧の情報 (CPU/GPU/価格/画像) で仮表示
+      if (s.cand && body.url) {
+        s.data = fromCandidate(s.cand);
+        s.caseImg = s.data.images[0] || "";
+        s.sceneImg = "";
+        renderCard(s); renderThumbs(s, box);
+        status.textContent += "\n→ ランキング一覧の情報で仮表示中（メモリ・ストレージは未取得。商品ページのソースを貼ると補完されます）";
+      }
     } finally { btn.disabled = pbtn.disabled = false; }
   };
   s.load = () => load("/api/fetch", { url: url.value.trim() });
@@ -132,7 +140,7 @@ function buildSlotPanel(s) {
   pbtn.onclick = () => load("/api/parse", { html: paste.value, url: url.value });
 
   box.append(
-    el("h3", {}, `${s.i + 1}位`, sel),
+    el("h3", {}, el("span", { class: "slot-title", text: `枠${s.i + 1}` }), sel),
     el("div", { class: "row" }, url, btn),
     status,
     el("details", {}, el("summary", { text: "取得できない場合: ソース貼り付け" }), paste, pbtn),
@@ -184,7 +192,7 @@ function renderCard(s) {
   for (const [k, label, icon] of [["CPU", "CPU", "cpu"], ["グラフィックス", "GPU", "gpu"], ["メモリ", "メモリ", "memory"], ["ストレージ", "SSD", "storage"]]) {
     rows.append(el("div", { class: "spec-row" },
       el("div", { class: "k" }, svg(icon), k),
-      ed("div", "v", specValue(d, label, detailed))));
+      ed("div", "v", specValue(d, label, detailed) || "—")));
   }
   const desc = s.descMode === "catch" && d.catchcopy ? d.catchcopy : th.desc;
   const info = el("div", { class: "card-info" },
@@ -197,7 +205,7 @@ function renderCard(s) {
 
   const side = el("div", { class: "card-side" },
     el("div", { class: "rank-badge" },
-      el("span", { class: "crown", text: "♛" }), el("span", { class: "a", text: "人気" }), ed("span", "b", `No.${s.i + 1}`)),
+      el("span", { class: "crown", text: "♛" }), el("span", { class: "a", text: "人気" }), ed("span", "b", `No.${s.rank ?? s.i + 1}`)),
     el("div", { class: "card-scene" }, s.sceneImg ? el("img", { src: s.sceneImg, alt: "" }) : null, price),
     el("div", { class: "card-chips" },
       ed("span", "h", th.chipsTitle),
@@ -211,7 +219,7 @@ function renderCard(s) {
 /* ------------------------------------------------------------ init */
 const cards = $("#cards");
 const slotsBox = $("#slots");
-slotsBox.append(el("h2", { text: "上位3モデル" }));
+slotsBox.append(el("h2", { text: "POPに載せる3モデル" }));
 for (const s of slots) {
   cards.append(el("div", { id: `card${s.i}` }));
   slotsBox.append(buildSlotPanel(s));
@@ -236,20 +244,92 @@ $("#mascotFile").onchange = (e) => {
 $(".rh-badge").style.right = "9mm";
 $("#btnPrint").onclick = () => window.print();
 
+function bigImage(u) {
+  return (u || "").replace(/([?&])sw=\d+/, "$1sw=1200");
+}
+
+// ランキング一覧の項目だけで作る仮データ (商品ページが取得できない時用)
+function fromCandidate(c) {
+  const m = c.name.match(/^(.*?)\s*(『.*』.*)$/);
+  const ks = [];
+  if (c.os) ks.push({ label: "OS", value: c.os, display: c.os, short: c.os });
+  if (c.cpu) ks.push({ label: "CPU", value: c.cpu, display: c.cpu, short: c.cpu });
+  if (c.video) ks.push({ label: "GPU", value: c.video, display: c.video, short: c.video });
+  return {
+    productId: c.url.match(/(MC\d+(?:-SN\d+)?)/)?.[1] || "", model: m ? m[1] : c.name, edition: m ? m[2] : "",
+    catchcopy: "", price: c.price, keySpecs: ks, images: c.image ? [bigImage(c.image)] : [], warnings: ["仮データ"],
+  };
+}
+
+/* ------------------------------------------------------------ ranking candidates */
+let candidates = [];
+let picked = []; // 選択順 (最大3)
+
+function renderCandidates() {
+  const box = $("#candidates");
+  box.replaceChildren();
+  if (!candidates.length) return;
+  box.append(el("h2", { text: `ランキング（${candidates.length}件）から3つ選択` }),
+    el("p", { class: "hint", text: "チェックした順に 枠1→枠2→枠3 に入ります。" }));
+  for (const c of candidates) {
+    const cb = el("input", { type: "checkbox" });
+    const idx = picked.indexOf(c);
+    cb.checked = idx >= 0;
+    cb.disabled = idx < 0 && picked.length >= 3;
+    cb.onchange = () => {
+      if (cb.checked) picked.push(c); else picked = picked.filter((x) => x !== c);
+      renderCandidates();
+    };
+    box.append(el("label", { class: "cand" + (idx >= 0 ? " on" : "") },
+      cb,
+      el("span", { class: "cand-slot", text: idx >= 0 ? `枠${idx + 1}` : "" }),
+      el("img", { src: c.image, loading: "lazy", alt: "" }),
+      el("span", { class: "cand-body" },
+        el("b", { text: `${c.rank}位 ` }), c.name,
+        el("small", { text: `${c.cpu} / ${c.video}　¥${yen(c.price)}` }))));
+  }
+  const go = el("button", { class: "primary wide", text: `選択した${picked.length}モデルでPOP作成` });
+  go.disabled = !picked.length;
+  go.onclick = applyPicked;
+  box.append(go);
+}
+
+async function applyPicked() {
+  slots.forEach((s, i) => {
+    const c = picked[i] || null;
+    s.cand = c;
+    s.rank = c ? c.rank : null;
+    s.setUrl(c ? c.url : "");
+    if (!c) { s.data = null; renderCard(s); }
+  });
+  for (const s of slots) if (s.cand) await s.load();
+}
+
 async function loadRanking(body) {
   const st = $("#rankStatus");
   st.className = "status"; st.textContent = "ランキング取得中…";
   try {
     const { items } = await call("/api/ranking", body);
+    candidates = items;
+    picked = items.slice(0, 3);
     st.className = "status ok";
-    st.textContent = items.map((it) => `${it.rank}位 ${it.name || it.url}`).join("\n");
-    items.slice(0, 3).forEach((it, i) => slots[i].setUrl(it.url));
-    for (const s of slots.slice(0, items.length)) await s.load();
+    st.textContent = `ランキング ${items.length}件を取得しました`;
+    renderCandidates();
+    await applyPicked();
   } catch (e) {
     st.className = "status err";
-    st.textContent = "エラー: " + e.message + "\n→ ソース貼り付け、または各順位のURLを直接入力してください。";
+    st.textContent = "エラー: " + e.message;
     $("#catPaste").open = true;
   }
 }
 $("#btnRank").onclick = () => loadRanking({ url: $("#catUrl").value.trim() });
 $("#btnRankParse").onclick = () => loadRanking({ url: $("#catUrl").value.trim(), html: $("#catHtml").value });
+
+// ブックマークレット / コンソール用のコピーコード
+const COPY_JS = "copy(document.querySelector('ul.model-card-list.--ranking').outerHTML)";
+const BOOKMARKLET = "javascript:(()=>{const u=document.querySelector('ul.model-card-list.--ranking');" +
+  "if(!u){alert('ランキングが見つかりません');return;}const h=u.outerHTML;" +
+  "navigator.clipboard.writeText(h).then(()=>alert('ランキングをコピーしました。POPツールに貼り付けてください。'),()=>prompt('Ctrl+Cでコピーしてください',h));})()";
+$("#copyCode").textContent = COPY_JS;
+$("#bookmarklet").href = BOOKMARKLET;
+$("#btnCopyCode").onclick = () => navigator.clipboard.writeText(COPY_JS).then(() => ($("#btnCopyCode").textContent = "コピーしました"));
