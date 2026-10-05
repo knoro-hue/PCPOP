@@ -286,7 +286,9 @@ function renderRow(s) {
       el("div", { class: "spec" }, el("div", { class: "k" }, svg(ic), k), ed("div", "v", v))));
 
   const head = el("div", { class: "rhead" },
-    c.tags?.length ? el("div", { class: "tags" }, ...c.tags.map((t) => ed("span", "tag", t))) : null,
+    c.tags?.length ? el("div", { class: "tags" },
+      ed("span", "tags-lbl", "キャンペーン内容"),  // 何のタグか分かるように見出しの帯を付ける
+      ...c.tags.map((t) => ed("span", "tag", t))) : null,
     ed("div", "name", model),
     edition ? ed("div", "edition", edition) : null);
 
@@ -319,7 +321,10 @@ function fitRow(row) {
 }
 
 const renderAll = () => slots.forEach(renderRow);
-document.fonts?.ready.then(() => { fitSeries(); slots.forEach((s) => fitRow($(`#row${s.i}`))); });
+// フォント (Poppins) が読み込まれたら幅が変わるので合わせ直す
+const refitAll = () => { fitSeries(); slots.forEach((s) => fitRow($(`#row${s.i}`))); };
+document.fonts?.ready.then(refitAll);
+document.fonts?.addEventListener?.("loadingdone", refitAll);
 $("#rows").addEventListener("input", (e) => { const r = e.target.closest(".rrow"); if (r) fitRow(r); });
 $("#popSeries").addEventListener("input", fitSeries);
 document.fonts?.load("900 italic 10mm Poppins").then(fitSeries);
