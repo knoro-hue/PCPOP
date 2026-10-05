@@ -12,11 +12,13 @@
   <nav class="tabs"><a href="/" class="on">ランキングPOP</a><a href="/single.html">個別POP</a></nav>
 
   <section>
-    <label class="lbl" for="catUrl">ランキングのあるページURL</label>
-    <div class="row">
-      <input id="catUrl" type="url" value="https://www.dospara.co.jp/TC30">
-      <button id="btnRank" class="primary">ランキング取得</button>
-    </div>
+    <button id="btnRank" class="primary wide">ランキング取得（全シリーズ）</button>
+    <details id="catUrlBox">
+      <summary>取得するページ</summary>
+      <textarea id="catUrls" rows="2" spellcheck="false">https://www.dospara.co.jp/TC30
+https://www.dospara.co.jp/TC143</textarea>
+      <p class="hint">1行に1ページ。全ページを同時に開いて、全シリーズのランキングを作ります。</p>
+    </details>
     <details id="catPaste">
       <summary>取得できない場合: ページを貼り付け</summary>
       <p class="hint">ドスパラのページを開いた状態で、次のどちらかでページ全体をコピーして貼り付けてください。</p>
@@ -27,14 +29,15 @@
           <a id="bookmarklet" class="bm" href="#">ページをコピー</a></li>
       </ol>
       <textarea id="catHtml" rows="4" placeholder="&lt;html&gt; ..."></textarea>
+      <input id="catUrl" type="url" placeholder="貼り付けたページのURL（例: https://www.dospara.co.jp/TC143）">
       <button id="btnRankParse">貼り付けたページからランキング取得</button>
     </details>
     <div id="rankStatus" class="status"></div>
   </section>
 
   <section id="seriesBox" hidden>
-    <label class="lbl" for="seriesSel">シリーズ</label>
-    <select id="seriesSel" class="wide-sel"></select>
+    <h2>シリーズ</h2>
+    <div id="seriesBtns" class="series-btns"></div>
     <div id="candidates"></div>
   </section>
 

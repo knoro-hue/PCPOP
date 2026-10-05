@@ -75,12 +75,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, scraper.parse_product(src, url))
             if self.path == "/api/ranking":
                 # ページ内の「〜ランキング」をシリーズごとに返す (ブラウザで表示し終わったページを読む)
-                url = (req.get("url") or "").strip()
-                src = req.get("html") or scraper.fetch_ranking_html(url)
-                sections = scraper.parse_ranking_sections(src, url or scraper.BASE)
+                if req.get("html"):  # 貼り付けたページ
+                    url = (req.get("url") or "").strip()
+                    sections = scraper.parse_ranking_sections(req["html"], url or scraper.BASE)
+                    errors = []
+                else:  # 指定ページ (既定: /TC30 と /TC143) をまとめて取得
+                    urls = [u.strip() for u in (req.get("urls") or scraper.RANKING_PAGES) if u.strip()]
+                    sections, errors = scraper.fetch_ranking_pages(urls)
                 if not sections:
-                    return self._json(422, {"error": "ページ内にランキングが見つかりませんでした"})
-                return self._json(200, {"sections": sections})
+                    return self._json(422, {"error": " / ".join(errors) or "ページ内にランキングが見つかりませんでした"})
+                return self._json(200, {"sections": sections, "errors": errors})
             if self.path == "/api/galleria":
                 # galleria.net のシリーズ紹介の背景・PC画像 (POP上部の背景に使う)
                 return self._json(200, {"series": scraper.galleria_series()})

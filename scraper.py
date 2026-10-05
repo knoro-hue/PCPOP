@@ -170,6 +170,7 @@ def find_browser() -> str | None:
 
 
 _BROWSER_LOCK = threading.Lock()
+_SLOT_LOCKS: dict[str, threading.Lock] = {}  # 同時に開くブラウザごとに別プロファイル
 
 
 def render_html(url: str, budget_ms: int = 8000, timeout: int = 60, _allow_any_host: bool = False) -> str:
@@ -340,7 +341,7 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def _browser_page(timeout: float, images: bool = False):
+def _browser_page(timeout: float, images: bool = False, slot: str = ""):
     """画面なしの Edge/Chrome を起動し、DevTools で操作できるページ (ws, 期限) を渡す。終わったら閉じる。"""
     import socket
 
@@ -350,7 +351,8 @@ def _browser_page(timeout: float, images: bool = False):
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
-    profile = os.path.join(tempfile.gettempdir(), "pcpop-browser-profile")
+    profile = os.path.join(tempfile.gettempdir(), "pcpop-browser-profile" + (f"-{slot}" if slot else ""))
+    lock = _BROWSER_LOCK if not slot else _SLOT_LOCKS.setdefault(slot, threading.Lock())
     cmd = [
         exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
         "--disable-extensions", "--mute-audio", f"--user-data-dir={profile}", f"--user-agent={UA}",
@@ -361,7 +363,7 @@ def _browser_page(timeout: float, images: bool = False):
     if os.name != "nt" and hasattr(os, "geteuid") and os.geteuid() == 0:
         cmd.insert(1, "--no-sandbox")
     deadline = time.time() + timeout
-    with _BROWSER_LOCK:  # 同じプロファイルを同時に使わない
+    with lock:  # 同じプロファイルを同時に使わない
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         ws = None
@@ -408,7 +410,8 @@ def _check_loaded(ws):
         raise FetchError("ブラウザでページを開けませんでした（ネットワークに接続できません）")
 
 
-def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45, _allow_any_host: bool = False) -> str:
+def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45, _allow_any_host: bool = False,
+                 slot: str = "") -> str:
     """Edge/Chrome (画面なし) でページを開き、ready_js が true になる (= 表示し終わる) まで待ってから HTML を返す。
 
     ページの JavaScript をそのまま実行させるので、ブラウザで見えている内容と同じものが取れる。
@@ -419,7 +422,7 @@ def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45
     hit = _cached(key)
     if hit is not None:
         return hit
-    with _browser_page(timeout) as (ws, deadline):
+    with _browser_page(timeout, slot=slot) as (ws, deadline):
         if ready_js is RANKING_READY_JS:
             ws.call("Page.enable")
             ws.call("Page.addScriptToEvaluateOnNewDocument", source=RANKING_PREPARE_JS)
@@ -509,9 +512,31 @@ def galleria_series(timeout: float = 45) -> dict:
     return data
 
 
-def fetch_ranking_html(url: str) -> str:
+# 「ランキング取得」で読むページ (全シリーズ: デスクトップ /TC30 + ノート /TC143)
+RANKING_PAGES = ["https://www.dospara.co.jp/TC30", "https://www.dospara.co.jp/TC143"]
+
+
+def fetch_ranking_html(url: str, slot: str = "") -> str:
     """ランキング (JavaScript で表示) を含む HTML を取得。ブラウザで表示し終わるまで待つ。"""
-    return render_until(url)
+    return render_until(url, slot=slot)
+
+
+def fetch_ranking_pages(urls: list[str]) -> tuple[list[dict], list[str]]:
+    """複数ページを同時に開き、全ページのシリーズをページ順に並べて返す。戻り値: (sections, エラー)"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(i: int, url: str):
+        try:
+            secs = parse_ranking_sections(fetch_ranking_html(url, slot=f"r{i}"), url)
+            if not secs:
+                raise ParseError("ランキングが見つかりませんでした")
+            return [{**s, "page": url} for s in secs], None
+        except (FetchError, ParseError) as e:
+            return [], f"{url}: {e}"
+
+    with ThreadPoolExecutor(max_workers=max(1, len(urls))) as ex:
+        results = list(ex.map(lambda a: one(*a), enumerate(urls)))
+    return [s for secs, _ in results for s in secs], [e for _, e in results if e]
 
 
 def _urllib_bytes(url: str, timeout: int, accept: str = "*/*") -> tuple[bytes, str | None]:

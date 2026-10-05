@@ -37,6 +37,29 @@ const svg = (name) => el("span", { html: `<svg viewBox="0 0 24 24" aria-hidden="
 
 const bigImage = (u) => (u || "").replace(/([?&])sw=\d+/, "$1sw=1200");
 
+/* ------------------------------------------------------------ 読み込み中の管理 (画像が出る前に印刷しない) */
+let busy = 0;
+let readyWaiters = [];
+function track(p) {
+  busy++; updatePrintButton();
+  const done = () => {
+    busy--; updatePrintButton();
+    if (!busy) { readyWaiters.forEach((f) => f()); readyWaiters = []; }
+  };
+  p.then(done, done);
+  return p;
+}
+const whenReady = () => (busy ? new Promise((r) => readyWaiters.push(r)) : Promise.resolve())
+  .then(() => document.fonts.ready).then(() => refitAll());
+function updatePrintButton() {
+  const b = $("#btnPrint");
+  if (!b) return;
+  b.disabled = busy > 0;
+  b.dataset.label ||= b.textContent;
+  b.textContent = busy > 0 ? "画像を読み込み中…（終わると印刷できます）" : b.dataset.label;
+  $("#pop").classList.toggle("loading", busy > 0);
+}
+
 /* ------------------------------------------------------------ state */
 let sections = [];   // [{title, series, items}]
 let section = null;  // 選択中のシリーズ
@@ -92,14 +115,22 @@ function renderHeader() {
 }
 
 // 背景: galleria.net のシリーズ画像 (取れない時は同じ雰囲気のグラデーション)
+let bgToken = 0;
 function renderBackground() {
   const bgEl = $("#rhBg");
   const { L } = seriesInfo(section);
   const g = $("#optOfficialBg").checked && galleria?.[L];
-  bgEl.style.backgroundImage = "";
-  bgEl.classList.toggle("official", !!g?.bg);
-  if (g?.bg?.url) bgEl.style.backgroundImage = `url("${viaLocal(g.bg.url)}")`;
-  else if (g?.bg?.css) bgEl.style.backgroundImage = g.bg.css;
+  const token = ++bgToken;
+  const apply = () => {
+    if (token !== bgToken) return;
+    bgEl.style.backgroundImage = "";
+    bgEl.classList.toggle("official", !!g?.bg);
+    if (g?.bg?.url) bgEl.style.backgroundImage = `url("${viaLocal(g.bg.url)}")`;
+    else if (g?.bg?.css) bgEl.style.backgroundImage = g.bg.css;
+  };
+  // 背景画像は読み込み終わってから差し替える (読み込み中は印刷できない)
+  if (g?.bg?.url) track(loadImg(g.bg.url).catch(() => {})).then(apply);
+  else apply();
 }
 
 // シリーズ名を枠の幅に収まる最大サイズに
@@ -148,7 +179,17 @@ const loadImg = (u) => new Promise((ok, ng) => {
 
 // WEBのカードと同じ重ね方: 手前に1台目 (黒)、右奥に2台目 (白)。2台目は1台目の幅の82%右へずらす
 const OVERLAP_SHIFT = 0.82;
-async function composeTop(urls) {
+const composed = new Map();  // 合成済みのトップ画像 (シリーズを切り替えても待たない)
+function composeTop(urls) {
+  const key = urls.join("\n");
+  if (!composed.has(key)) {
+    const p = composeTopRaw(urls);
+    p.catch(() => composed.delete(key));
+    composed.set(key, p);
+  }
+  return composed.get(key);
+}
+async function composeTopRaw(urls) {
   const parts = (await Promise.all(urls.map(loadImg))).map(trimImage);
   if (parts.length === 1) return parts[0].toDataURL("image/png");
   let [a, b] = parts;
@@ -169,13 +210,24 @@ async function renderTopImage() {
   $("#topThumbs").querySelectorAll(".th").forEach((x) => x.classList.toggle("sel", sameImgs(x._imgs, topImgs)));
   const token = ++topToken;
   if (!topImgs.length) { img.hidden = true; return; }
-  try {
-    const src = await composeTop(topImgs);
+  await track((async () => {
+    let src;
+    try {
+      src = await composeTop(topImgs);
+    } catch {
+      src = topImgs[0];  // 中継できない時はそのまま
+    }
     if (token !== topToken) return;
     img.src = src; img.hidden = false;
-  } catch {
-    if (token !== topToken) return;
-    img.src = topImgs[0]; img.hidden = false;  // 中継できない時はそのまま
+    await img.decode().catch(() => {});
+  })());
+}
+
+// 取得直後に全シリーズのトップ画像を先に読み込んでおく
+function prefetchTopImages() {
+  for (const s of sections) {
+    const imgs = defaultTopImgs(s.items[0]);
+    if (imgs.length) composeTop(imgs).catch(() => {});
   }
 }
 
@@ -225,13 +277,13 @@ async function loadGalleria() {
   const st = $("#galleriaStatus");
   st.className = "status"; st.textContent = "galleria.net の背景画像を取得中…";
   try {
-    ({ series: galleria } = await call("/api/galleria", {}));
+    ({ series: galleria } = await track(call("/api/galleria", {})));
     st.className = "status ok"; st.textContent = `galleria.net の画像を取得しました（${Object.keys(galleria).join(" / ")} Series）`;
   } catch (e) {
     galleria = {};
     st.className = "status err"; st.textContent = "galleria.net の画像を取得できませんでした（シリーズ別の色で表示します）: " + e.message;
   }
-  renderBackground(); buildTopThumbs();
+  if (section) { renderBackground(); buildTopThumbs(); }
 }
 $("#optOfficialBg").onchange = renderBackground;
 
@@ -354,32 +406,54 @@ function applyPicked() {
 
 function selectSection(i) {
   section = sections[i];
+  $("#seriesBtns").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b._i === i));
   picked = section.items.slice(0, 3);
   renderCandidates();
   applyPicked();
 }
 
-$("#seriesSel").onchange = (e) => selectSection(Number(e.target.value));
+// シリーズはボタンで常に全部表示 (ページごとに見出し)
+function buildSeriesButtons() {
+  const box = $("#seriesBtns");
+  box.replaceChildren();
+  const pages = [...new Set(sections.map((s) => s.page || ""))];
+  sections.forEach((s, i) => {
+    if (pages.length > 1 && (i === 0 || sections[i - 1].page !== s.page)) {
+      const note = sections.filter((x) => x.page === s.page).some((x) => x.items.some((c) => c.display));
+      box.append(el("div", { class: "grp", text: `${note ? "ゲーミングノート" : "ゲーミングデスクトップ"}（${(s.page || "").replace(/^https?:\/\/[^/]+/, "")}）` }));
+    }
+    const { main, sub } = seriesInfo(s);
+    const b = el("button", { type: "button" }, main, el("small", { text: `${sub ? sub + "・" : ""}${s.items.length}件` }));
+    b._i = i;
+    b.onclick = () => selectSection(i);
+    box.append(b);
+  });
+}
 
 async function loadRanking(body) {
   const st = $("#rankStatus");
-  st.className = "status"; st.textContent = "ランキング取得中…（ページの表示を待っています。10秒ほどかかります）";
+  st.className = "status"; st.textContent = "ランキング取得中…（ページの表示を待っています。10〜20秒ほどかかります）";
+  $("#btnRank").disabled = true;
+  if (!galleria) loadGalleria();  // 背景画像は並行して取得
   try {
-    ({ sections } = await call("/api/ranking", body));
-    const sel = $("#seriesSel");
-    sel.replaceChildren(...sections.map((s, i) => el("option", { value: String(i), text: `${s.series}（${s.items.length}件）` })));
+    let errors;
+    ({ sections, errors } = await track(call("/api/ranking", body)));
+    buildSeriesButtons();
     $("#seriesBox").hidden = false;
-    st.className = "status ok";
-    st.textContent = `${sections.length}シリーズのランキングを取得しました`;
+    st.className = errors?.length ? "status err" : "status ok";
+    st.textContent = `${sections.length}シリーズのランキングを取得しました` +
+      (errors?.length ? "\n取得できなかったページ: " + errors.join("\n") : "");
     selectSection(0);
-    if (!galleria) loadGalleria();
+    prefetchTopImages();
   } catch (e) {
     st.className = "status err";
     st.textContent = "エラー: " + e.message;
     $("#catPaste").open = true;
+  } finally {
+    $("#btnRank").disabled = false;
   }
 }
-$("#btnRank").onclick = () => loadRanking({ url: $("#catUrl").value.trim() });
+$("#btnRank").onclick = () => loadRanking({ urls: $("#catUrls").value.split(/\s+/).filter(Boolean) });
 $("#btnRankParse").onclick = () => loadRanking({ url: $("#catUrl").value.trim(), html: $("#catHtml").value });
 
 // ページ全体 (JavaScript 実行後) をコピーするコード
@@ -403,7 +477,12 @@ opt("optPrice", "no-price");
 opt("optInstall", "no-inst");
 opt("optStock", "no-stock");
 opt("optTags", "no-tags");
-$("#btnPrint").onclick = () => window.print();
+const btnPrint = $("#btnPrint");
+btnPrint.onclick = async () => {
+  await whenReady();
+  window.print();
+};
+updatePrintButton();
 
 // 印刷余白: @page の余白を設定し、POP全体をその内側に収まるよう縮小
 const printStyle = el("style");

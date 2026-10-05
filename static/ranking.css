@@ -5,6 +5,14 @@
 .slot h3 { margin: 0 0 6px; font-size: 13px; }
 .slot .status { margin-top: 4px; }
 .slot-title { font-weight: bold; }
+#catUrls { width: 100%; font: 12px/1.5 monospace; margin-top: 4px; box-sizing: border-box; }
+#catUrl { width: 100%; box-sizing: border-box; margin: 4px 0; }
+#catUrlBox { margin-top: 6px; font-size: 12px; }
+.series-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.series-btns button { text-align: left; padding: 7px 8px; line-height: 1.25; font-size: 13px; }
+.series-btns button small { display: block; font-size: 11px; opacity: .75; font-weight: normal; }
+.series-btns button.on { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: bold; }
+.series-btns .grp { grid-column: 1 / -1; font-size: 11px; color: #667; margin-top: 2px; }
 .wide-sel { width: 100%; padding: 6px; font-size: 13px; margin-bottom: 6px; }
 #topThumbs { grid-template-columns: repeat(3, 1fr); margin-bottom: 6px; }
 #topThumbs .th {
@@ -226,6 +234,16 @@
 .rpop.no-inst .pricebox .inst,
 .rpop.no-stock .pricebox .stock { display: none; }
 
+/* 画像の読み込み中: 画面には表示、印刷 (Ctrl+P でも) は POP の代わりに注意書き */
+.rpop.loading .rh-img::after {
+  content: "画像を読み込み中…"; position: absolute; right: 2mm; bottom: 2mm; z-index: 3;
+  background: rgba(0,0,0,.6); color: #fff; font: bold 3.2mm/1 sans-serif; padding: 1.6mm 2.4mm; border-radius: 1mm;
+}
 @media print {
   .rpop { box-shadow: none; }
+  .rpop.loading { display: none !important; }
+  body:has(.rpop.loading)::before {
+    content: "画像を読み込み中のため印刷できません。読み込みが終わってから、もう一度印刷してください。";
+    display: block; padding: 40mm 20mm; font: bold 7mm/1.6 sans-serif; text-align: center;
+  }
 }
