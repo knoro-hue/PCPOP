@@ -136,14 +136,35 @@
 .card-price .inst { text-align: right; font-size: 2.8mm; color: #333; font-weight: bold; margin-top: 1mm; }
 .card-price .inst b { font-size: 3.8mm; color: var(--navy); }
 
+/* 順位バッジ: カード左上 / 1位 金・2位 銀・3位 銅 */
 .rank-badge {
-  flex-shrink: 0; width: 17mm; height: 17mm; border-radius: 50%;
-  background: #e8115b; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-weight: 900; line-height: 1; border: .8mm solid #fff; box-shadow: 0 .6mm 1.2mm rgba(0,0,0,.3);
+  position: absolute; z-index: 3; top: 1.2mm; left: 1.5mm; width: 17mm; height: 17mm; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-weight: 900; line-height: 1; border: .7mm solid #fff;
+  box-shadow: 0 .7mm 1.4mm rgba(0,0,0,.35), inset 0 -1mm 1.5mm rgba(0,0,0,.18), inset 0 1mm 1.5mm rgba(255,255,255,.55);
+  background: #e8115b; color: #fff;
 }
-.rank-badge .crown { color: var(--yellow); font-size: 3.2mm; }
-.rank-badge .a { font-size: 3.3mm; }
+.rank-badge .crown { font-size: 3.2mm; }
+.rank-badge .a { font-size: 3.2mm; }
 .rank-badge .b { font-size: 5.8mm; letter-spacing: -.03em; }
+.rank-badge.rank-1 {
+  background: radial-gradient(circle at 32% 28%, #fff7c2 0%, #ffd84a 30%, #e9b10f 62%, #a87400 100%);
+  color: #5a3a00; text-shadow: 0 .3mm 0 rgba(255,255,255,.6);
+}
+.rank-badge.rank-1 .crown { color: #fff; text-shadow: 0 0 1mm #a87400; }
+.rank-badge.rank-2 {
+  background: radial-gradient(circle at 32% 28%, #ffffff 0%, #e6e9ee 30%, #b9c0ca 62%, #7d8591 100%);
+  color: #3a4250; text-shadow: 0 .3mm 0 rgba(255,255,255,.7);
+}
+.rank-badge.rank-2 .crown { color: #fff; text-shadow: 0 0 1mm #7d8591; }
+.rank-badge.rank-3 {
+  background: radial-gradient(circle at 32% 28%, #ffe0c0 0%, #e9a165 30%, #c06f2e 62%, #7e4214 100%);
+  color: #fff; text-shadow: 0 .3mm .6mm rgba(80,35,5,.8);
+}
+.rank-badge.rank-3 .crown { color: #ffe9c9; }
+/* バッジの分、見出しタブの文字を右へ */
+.card-tab { padding-left: 20.5mm; }
+.rpop.no-rank .card-tab { padding-left: 3mm; }
 
 /* ---------- footer ---------- */
 .rf {

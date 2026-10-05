@@ -205,12 +205,14 @@ function renderCard(s) {
     el("div", { class: "card-chips" },
       ed("span", "h", th.chipsTitle),
       el("div", { class: "chips" }, ...th.chips.map(([ic, t]) => el("div", { class: "chip" }, svg(ic), ed("div", "", t))))),
-    el("div", { class: "price-row" },
-      price,
-      el("div", { class: "rank-badge" },
-        el("span", { class: "crown", text: "♛" }), el("span", { class: "a", text: "人気" }), ed("span", "b", `No.${s.rank ?? s.i + 1}`))));
+    el("div", { class: "price-row" }, price));
 
-  card.append(tab, el("div", { class: "card-body" },
+  // 順位バッジ (左上): 1位 金 / 2位 銀 / 3位 銅
+  const rank = s.rank ?? s.i + 1;
+  const badge = el("div", { class: `rank-badge rank-${rank <= 3 ? rank : "other"}` },
+    el("span", { class: "crown", text: "♛" }), el("span", { class: "a", text: "人気" }), ed("span", "b", `No.${rank}`));
+
+  card.append(badge, tab, el("div", { class: "card-body" },
     el("div", { class: "card-case" }, s.caseImg ? el("img", { src: s.caseImg, alt: "" }) : null),
     info, side));
 }
