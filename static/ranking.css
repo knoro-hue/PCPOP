@@ -131,7 +131,7 @@
 .rrow {
   --m1: #ffe9a6; --m2: #e9b10f; --m3: #8a6200; --tint: #fffaf0;  /* 金 */
   flex: 1; min-height: 0; padding: 1.5mm 4mm 3mm 2.5mm;
-  display: grid; grid-template-columns: 22mm minmax(0, 1fr) 70mm; grid-template-rows: auto minmax(0, 1fr);
+  display: grid; grid-template-columns: 22mm minmax(0, 1fr) 76mm; grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas: "medal head head" "specs specs price"; column-gap: 3.5mm; row-gap: 1.8mm; align-items: center;
   position: relative; border-radius: 2.5mm;
   background: linear-gradient(100deg, var(--tint) 0%, #fff 30%, #fff 75%, #f3f6fb 100%);
@@ -155,7 +155,7 @@
 .medal .no { font-size: 8mm; letter-spacing: -.04em; }
 .medal .i { font-size: 4mm; margin-left: .3mm; }
 
-.rhead { grid-area: head; min-width: 0; border-bottom: .5mm solid rgba(10,42,122,.15); padding-bottom: 1.2mm; }
+.rhead { grid-area: head; min-width: 0; border-bottom: .5mm solid rgba(10,42,122,.15); padding-bottom: .8mm; }
 .rrow { --k: 1; overflow: hidden; }
 .rhead .tags { display: flex; flex-wrap: wrap; align-items: stretch; gap: 1mm; margin-bottom: 1mm; }
 .rhead .tags-lbl {
@@ -168,7 +168,7 @@
   padding: .3mm 2mm; line-height: 1.3;
 }
 .rpop.no-tags .rhead .tags { display: none; }
-.rhead .name { font-family: var(--en); font-size: calc(5.4mm * var(--k)); font-weight: 800; color: #0b1330; line-height: 1.22; overflow-wrap: anywhere; }
+.rhead .name { font-family: var(--en); font-size: calc(5mm * var(--k)); font-weight: 800; color: #0b1330; line-height: 1.22; overflow-wrap: anywhere; }
 .rhead .edition { font-size: calc(2.8mm * var(--k)); color: #555; font-weight: bold; line-height: 1.3; margin-top: .4mm; }
 .rpop .specs { grid-area: specs; min-width: 0; align-self: center; display: flex; flex-direction: column; gap: calc(.9mm * var(--k));
   margin: 0; border: 0; overflow: visible; }  /* 個別POP (style.css) の .specs を打ち消す */
@@ -186,9 +186,9 @@
 }
 
 .pricebox {
-  grid-area: price; align-self: stretch; min-height: 24mm; display: flex; flex-direction: column; justify-content: center;
+  grid-area: price; align-self: stretch; min-height: 0; display: flex; flex-direction: column; justify-content: center;
   background: linear-gradient(180deg, #fff 60%, #fff3f4); border: .7mm solid var(--red); border-radius: 2.5mm; box-shadow: 0 .9mm 0 #b81d2c;
-  padding: 2mm 3.5mm; position: relative; line-height: 1; margin: 1.5mm 0 .5mm;
+  padding: 3.6mm 3.5mm 1.2mm; position: relative; line-height: 1; margin: 1.2mm 0 0;
 }
 .pricebox .stock {
   position: absolute; top: -2.8mm; right: 3mm; background: var(--navy); color: #fff; font-size: 3.4mm; font-weight: 900;
@@ -198,13 +198,13 @@
   position: absolute; top: -.7mm; left: -.7mm; background: var(--red); color: #fff; font-size: 3.4mm; font-weight: 900;
   padding: .8mm 2.4mm; border-radius: 2.5mm 0 2.5mm 0;
 }
-.pricebox .amt { text-align: right; color: var(--red); white-space: nowrap; overflow: hidden; margin-top: 3mm; font-family: var(--en); font-style: italic; font-weight: 800; }
-.pricebox .y { font-size: 7.5mm; margin-right: .6mm; }
-.pricebox .n { font-size: 16mm; letter-spacing: -.02em; }
-.pricebox .t { font-style: normal; font-family: var(--jp); }
+.pricebox .amt { text-align: right; color: var(--red); white-space: nowrap; margin-top: 0; line-height: 1; font-family: var(--en); font-style: italic; font-weight: 800; }
+.pricebox .y { font-size: 7.5mm; margin-right: .6mm; line-height: 1; }
+.pricebox .n { font-size: 16mm; letter-spacing: -.035em; }
+.pricebox .t { font-style: normal; font-family: var(--jp); vertical-align: baseline; line-height: 1; }
 .pricebox .t { font-size: 3.6mm; color: #333; margin-left: 1mm; }
-.pricebox .inst { text-align: right; font-size: 3.6mm; color: #333; font-weight: bold; margin-top: 2mm; }
-.pricebox .inst b { font-family: var(--en); font-size: 6mm; color: var(--navy); }
+.pricebox .inst { text-align: right; font-size: 3.4mm; color: #333; font-weight: bold; margin-top: .4mm; line-height: 1; }
+.pricebox .inst b { font-family: var(--en); font-size: 5.4mm; color: var(--navy); }
 
 /* footer */
 .rf {

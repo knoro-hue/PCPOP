@@ -112,34 +112,18 @@ function fitSeries() {
 
 const sameImgs = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-// 画像の白い背景を透明にして (外周からつながる白だけ)、余白を切り取る
+// 画像の外側の余白だけを切り取る (画像そのものは加工しない)
 function trimImage(img) {
   const c = document.createElement("canvas");
   c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext("2d");
   g.drawImage(img, 0, 0);
-  const id = g.getImageData(0, 0, c.width, c.height);
-  const { data, width: w, height: h } = id;
-  const isBg = (p) => data[p * 4 + 3] < 16 || (data[p * 4] > 236 && data[p * 4 + 1] > 236 && data[p * 4 + 2] > 236);
-  const seen = new Uint8Array(w * h);
-  const q = new Int32Array(w * h);
-  let qh = 0, qt = 0;
-  const push = (p) => { if (!seen[p] && isBg(p)) { seen[p] = 1; q[qt++] = p; } };
-  for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
-  for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
-  while (qh < qt) {
-    const p = q[qh++], x = p % w;
-    data[p * 4 + 3] = 0;
-    if (x > 0) push(p - 1);
-    if (x < w - 1) push(p + 1);
-    if (p >= w) push(p - w);
-    if (p < w * (h - 1)) push(p + w);
-  }
-  g.putImageData(id, 0, 0);
+  const { data, width: w, height: h } = g.getImageData(0, 0, c.width, c.height);
+  const blank = (i) => data[i + 3] < 16 || (data[i] > 245 && data[i + 1] > 245 && data[i + 2] > 245);
   let x0 = w, y0 = h, x1 = -1, y1 = -1;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      if (data[(y * w + x) * 4 + 3] > 16) {
+      if (!blank((y * w + x) * 4)) {
         if (x < x0) x0 = x; if (x > x1) x1 = x;
         if (y < y0) y0 = y; if (y > y1) y1 = y;
       }
@@ -295,8 +279,8 @@ function renderRow(s) {
   const inst = c.installment;
   const priceBox = el("div", { class: "pricebox" },
     c.stock ? ed("div", "stock", c.stock) : null,
-    el("div", { class: "lbl", text: "販売価格" }),
-    el("div", { class: "amt" }, el("span", { class: "y", text: "¥" }), ed("span", "n", yen(c.price)), el("span", { class: "t", text: "税込" })),
+    el("div", { class: "lbl", text: "販売価格（税込）" }),
+    el("div", { class: "amt" }, el("span", { class: "y", text: "¥" }), ed("span", "n", yen(c.price))),
     inst?.monthly ? el("div", { class: "inst" }, "月々 ", ed("b", "", yen(inst.monthly)), `円（${inst.count || 36}回）`) : null);
 
   row.append(medal, head, specs, priceBox);
@@ -305,18 +289,21 @@ function renderRow(s) {
 
 // 段からはみ出す時は文字を少しずつ小さくする (スペックは改行して全部表示)
 function fitRow(row) {
-  // 価格は枠の幅に収まるサイズに
-  const amt = row.querySelector(".amt"), n = row.querySelector(".amt .n");
-  if (amt && n) {
-    let mm = 16;
-    n.style.fontSize = mm + "mm";
-    while (mm > 8 && amt.scrollWidth > amt.clientWidth + 1) { mm -= 0.25; n.style.fontSize = mm + "mm"; }
-  }
+  const box = row.querySelector(".pricebox"), amt = row.querySelector(".amt"), n = row.querySelector(".amt .n");
+  if (n) n.style.fontSize = "";
   let k = 1;
   row.style.setProperty("--k", k);
   while (k > 0.6 && row.scrollHeight > row.clientHeight + 1) {
     k = Math.round((k - 0.04) * 100) / 100;
     row.style.setProperty("--k", k);
+  }
+  // 価格は枠に収まる最大サイズに (幅も高さも見る: 月々の分割価格と重ならないように)
+  if (box && amt && n) {
+    let mm = 16;
+    n.style.fontSize = mm + "mm";
+    while (mm > 7 && (amt.scrollWidth > amt.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1)) {
+      mm -= 0.25; n.style.fontSize = mm + "mm";
+    }
   }
 }
 
