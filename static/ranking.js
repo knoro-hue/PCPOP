@@ -260,15 +260,14 @@ $("#seriesSel").onchange = (e) => selectSection(Number(e.target.value));
 
 async function loadRanking(body) {
   const st = $("#rankStatus");
-  st.className = "status"; st.textContent = "ランキング取得中…";
+  st.className = "status"; st.textContent = "ランキング取得中…（ページの表示を待っています。10秒ほどかかります）";
   try {
-    let warnings;
-    ({ sections, warnings = [] } = await call("/api/ranking", body));
+    ({ sections } = await call("/api/ranking", body));
     const sel = $("#seriesSel");
     sel.replaceChildren(...sections.map((s, i) => el("option", { value: String(i), text: `${s.series}（${s.items.length}件）` })));
     $("#seriesBox").hidden = false;
-    st.className = warnings.length ? "status err" : "status ok";
-    st.textContent = `${sections.length}シリーズのランキングを取得しました` + warnings.map((w) => "\n⚠ " + w).join("");
+    st.className = "status ok";
+    st.textContent = `${sections.length}シリーズのランキングを取得しました`;
     selectSection(0);
   } catch (e) {
     st.className = "status err";

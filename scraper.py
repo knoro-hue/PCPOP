@@ -169,12 +169,179 @@ def render_html(url: str, budget_ms: int = 8000, timeout: int = 60, _allow_any_h
     return _store(key, out)
 
 
+# ---------------------------------------------------------------- 実ブラウザで表示されるまで待って読む (DevTools)
+
+# ページ上のランキング枠がすべて表示し終わったか (商品リンクと価格が入ったか)
+RANKING_READY_JS = r"""
+(() => {
+  if (document.readyState !== 'complete') return false;
+  const uls = [...document.querySelectorAll('ul.model-card-list.--ranking')];
+  if (!uls.length) return true;
+  return uls.every((ul) => {
+    const a = ul.querySelector('a[href*="/MC"]');
+    const p = ul.querySelector('[data-key="amttaxnounit"]');
+    return a && (!p || p.textContent.trim() !== '');
+  });
+})()
+"""
+
+
+class _WebSocket:
+    """DevTools 用の最小 WebSocket クライアント (標準ライブラリのみ)。"""
+
+    def __init__(self, ws_url: str, timeout: float):
+        import base64
+        import socket
+
+        u = urlparse(ws_url)
+        self.sock = socket.create_connection((u.hostname, u.port), timeout=timeout)
+        key = base64.b64encode(os.urandom(16)).decode()
+        self.sock.sendall((f"GET {u.path} HTTP/1.1\r\nHost: {u.hostname}:{u.port}\r\nUpgrade: websocket\r\n"
+                           f"Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+        head = b""
+        while b"\r\n\r\n" not in head:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise FetchError("ブラウザとの接続に失敗しました")
+            head += chunk
+        if b" 101 " not in head.split(b"\r\n", 1)[0]:
+            raise FetchError("ブラウザとの接続に失敗しました: " + head.split(b"\r\n", 1)[0].decode(errors="replace"))
+        self.buf = head.split(b"\r\n\r\n", 1)[1]
+        self.next_id = 0
+
+    def _read(self, n: int) -> bytes:
+        while len(self.buf) < n:
+            chunk = self.sock.recv(max(65536, n - len(self.buf)))
+            if not chunk:
+                raise FetchError("ブラウザとの接続が切れました")
+            self.buf += chunk
+        out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+    def _send(self, text: str):
+        data = text.encode()
+        n = len(data)
+        head = bytes([0x81])
+        if n < 126:
+            head += bytes([0x80 | n])
+        elif n < 65536:
+            head += bytes([0x80 | 126]) + n.to_bytes(2, "big")
+        else:
+            head += bytes([0x80 | 127]) + n.to_bytes(8, "big")
+        mask = os.urandom(4)
+        self.sock.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(data)))
+
+    def _recv(self) -> str:
+        parts = []
+        while True:
+            b0, b1 = self._read(2)
+            n = b1 & 0x7F
+            if n == 126:
+                n = int.from_bytes(self._read(2), "big")
+            elif n == 127:
+                n = int.from_bytes(self._read(8), "big")
+            payload = self._read(n)
+            op = b0 & 0x0F
+            if op in (0x1, 0x0):
+                parts.append(payload)
+                if b0 & 0x80:
+                    return b"".join(parts).decode("utf-8", errors="replace")
+            elif op == 0x8:
+                raise FetchError("ブラウザとの接続が切れました")
+
+    def call(self, method: str, **params):
+        self.next_id += 1
+        mid = self.next_id
+        self._send(json.dumps({"id": mid, "method": method, "params": params}))
+        while True:
+            msg = json.loads(self._recv())
+            if msg.get("id") == mid:
+                if "error" in msg:
+                    raise FetchError(f"ブラウザ: {msg['error'].get('message')}")
+                return msg.get("result", {})
+
+    def close(self):
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+
+def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45, _allow_any_host: bool = False) -> str:
+    """Edge/Chrome (画面なし) でページを開き、ready_js が true になる (= 表示し終わる) まで待ってから HTML を返す。
+
+    ページの JavaScript をそのまま実行させるので、ブラウザで見えている内容と同じものが取れる。
+    """
+    import socket
+
+    if not _allow_any_host:
+        _check_host(url)
+    key = "ready:" + url
+    hit = _cached(key)
+    if hit is not None:
+        return hit
+    exe = find_browser()
+    if not exe:
+        raise FetchError("Edge / Chrome が見つかりません（環境変数 PCPOP_BROWSER で場所を指定できます）")
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    profile = os.path.join(tempfile.gettempdir(), "pcpop-browser-profile")
+    cmd = [
+        exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+        "--disable-extensions", "--mute-audio", f"--user-data-dir={profile}", f"--user-agent={UA}",
+        "--blink-settings=imagesEnabled=false", f"--remote-debugging-port={port}",
+        "--remote-allow-origins=*", "about:blank",
+    ]
+    if os.name != "nt" and hasattr(os, "geteuid") and os.geteuid() == 0:
+        cmd.insert(1, "--no-sandbox")
+    deadline = time.time() + timeout
+    with _BROWSER_LOCK:
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        ws = None
+        try:
+            ws_url = None
+            while time.time() < deadline and ws_url is None:
+                try:
+                    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(
+                            f"http://127.0.0.1:{port}/json/list", timeout=2) as r:
+                        pages = [t for t in json.loads(r.read()) if t.get("type") == "page"]
+                    if pages:
+                        ws_url = pages[0]["webSocketDebuggerUrl"]
+                except OSError:
+                    time.sleep(0.2)
+            if not ws_url:
+                raise FetchError("ブラウザを起動できませんでした")
+            ws = _WebSocket(ws_url, timeout=max(5, deadline - time.time()))
+            ws.call("Page.navigate", url=url)
+            ready = False
+            while time.time() < deadline:
+                time.sleep(0.4)
+                r = ws.call("Runtime.evaluate", expression=ready_js, returnByValue=True)
+                if r.get("result", {}).get("value") is True:
+                    ready = True
+                    break
+            out = ws.call("Runtime.evaluate", expression="document.documentElement.outerHTML",
+                          returnByValue=True).get("result", {}).get("value") or ""
+        finally:
+            if ws:
+                ws.close()
+            proc.kill()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+    if "<html" not in out.lower() and "<head" not in out.lower():
+        raise FetchError("ブラウザでページを開けませんでした")
+    if not ready:
+        return out  # 時間内に全部は出なかった: 出ている分で読む (キャッシュしない)
+    return _store(key, out)
+
+
 def fetch_ranking_html(url: str) -> str:
-    """ランキング (JavaScript で描画) を含む HTML を取得。"""
-    try:
-        return render_html(url)
-    except subprocess.TimeoutExpired as e:
-        raise FetchError("ブラウザでの読み込みがタイムアウトしました") from e
+    """ランキング (JavaScript で表示) を含む HTML を取得。ブラウザで表示し終わるまで待つ。"""
+    return render_until(url)
 
 
 def _urllib_bytes(url: str, timeout: int, accept: str = "*/*") -> tuple[bytes, str | None]:
@@ -569,31 +736,40 @@ def _by_key(chunk: str, key: str) -> str:
     return _text(v) if v else ""
 
 
-def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> list[dict]:
-    """カテゴリページ (例: /gamepc) のランキング `ul.model-card-list.--ranking` を全件返す。
+_CARD_LI = re.compile(r'<li\b(?=[^>]*(?:\bclass="[^"]*\bmodel-card\b|\bdata-ranking=))[^>]*>', re.I)
 
-    各 `li[data-ranking]` から 商品URL・名前・画像・価格・出荷目安・主要スペック・訴求タグ を取得。
+
+def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> list[dict]:
+    """ランキング `ul.model-card-list.--ranking` (JavaScript で表示された後の HTML) を全件返す。
+
+    カードごとに 順位・商品URL・名前・画像・価格・出荷目安・主要スペック・訴求タグ。
+    順位は li か カード内の data-ranking。色違いの <object> (別順位の画像/ボタン) は読まない。
     """
     src = re.sub(r"<!--.*?-->", "", src, flags=re.S)  # コメントアウトされたタグを除外
     m = _RANK_UL.search(src)
     if not m:
         return []
     body = src[m.end():]
-    lis = list(_RANK_LI.finditer(body))
+    nxt = _RANK_UL.search(body)  # 次のランキング枠より前まで
+    if nxt:
+        body = body[:nxt.start()]
+    lis = list(_CARD_LI.finditer(body))
     items = []
     for i, li in enumerate(lis):
         end = lis[i + 1].start() if i + 1 < len(lis) else len(body)
-        chunk = body[li.end():end]
-        href = _first(r'<a\b[^>]*\bhref="([^"]+)"', chunk) or ""
+        chunk = re.sub(r'(?is)<object\b(?=[^>]*(?:\bdata-ranking=|\bclass="[^"]*\bmodel-(?:img|btn)\b))[^>]*>.*?</object>',
+                       "", body[li.start():end])
+        rank = _first(r'data-ranking="(\d+)"', chunk)
+        href = _first(r'<a\b[^>]*\bhref="([^"]*MC\d+[^"]*)"', chunk) or ""
         href = html.unescape(href)
-        if not _MC_URL.search(href):
-            continue  # 未描画のテンプレート (href 空など)
+        if not rank or not _MC_URL.search(href):
+            continue  # 未表示のテンプレート (href 空など)
         img = _first(r'<img\b[^>]*\bsrc="([^"]+)"[^>]*data-key="primeimgurl"', chunk) or _first(
-            r'<img\b[^>]*data-key="primeimgurl"[^>]*\bsrc="([^"]+)"', chunk) or _first(r'<img\b[^>]*\bsrc="([^"]+)"', chunk)
+            r'<img\b[^>]*data-key="primeimgurl"[^>]*\bsrc="([^"]+)"', chunk) or _first(r'<img\b[^>]*\bsrc="(http[^"]+)"', chunk)
         monthly = _first(r'data-format="\{installmentAmt\}"[^>]*>([\d,]+)<', chunk)
         count = _first(r'data-format="\{installment\}回"[^>]*>(\d+)回<', chunk)
         items.append({
-            "rank": int(li.group(1)),
+            "rank": int(rank),
             "url": urljoin(base_url, href),
             "name": _by_key(chunk, "primename"),
             "image": html.unescape(img) if img else "",
@@ -607,8 +783,8 @@ def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> l
         })
     if not items:
         raise RankingNotRendered(
-            "ランキング枠は見つかりましたが中身が空です（ブラウザ上でJavaScriptが表示する仕組みのため）。"
-            "「ランキングを貼り付け」の手順でコピーしたHTMLを貼ってください。"
+            "ランキング枠の中身が空です（ページのソースには順位が入っていません）。"
+            "「ランキング取得」ボタンを使うか、ドスパラのページで F12 →「Console」のコードでコピーしたものを貼ってください。"
         )
     items.sort(key=lambda x: x["rank"])
     return items[:limit] if limit else items
@@ -711,20 +887,11 @@ def parse_ranking_sections(src: str, base_url: str = BASE) -> list[dict]:
             continue
         end = heads[i + 1].start() if i + 1 < len(heads) else len(src)
         region = src[h.end():end]
-        ul = _RANK_UL.search(region)
-        if ul:
+        if _RANK_UL.search(region):
             try:
                 items = parse_ranking(region, base_url)
             except RankingNotRendered:
                 items = []
-            if not items:
-                # JavaScript で中身を入れる枠: 中身の出どころ (ランキング用カテゴリ / 一覧ページ) を控えておく
-                cat = _first(r'data-categoryname="([^"]+)"', ul.group(0))
-                more = _first(r'class="more-link"[^>]*>\s*<a\b[^>]*\bhref="([^"]+)"', region)
-                if cat or more:
-                    sections.append({"title": title, "series": _series_name(title), "items": [],
-                                     "category": cat, "more": urljoin(base_url, html.unescape(more)) if more else None})
-                continue
         else:
             items = _parse_series_cards(region, base_url)
         if items:
@@ -735,138 +902,6 @@ def parse_ranking_sections(src: str, base_url: str = BASE) -> list[dict]:
         if items:
             sections.append({"title": "人気ランキング", "series": "人気ランキング", "items": items})
     return sections
-
-
-# ---------------------------------------------------------------- category listing (サーバー側で描画済みの商品一覧)
-
-_TILE = re.compile(r'<div\b[^>]*class="[^"]*\bp-products-all-item-product\b[^"]*"[^>]*\bdata-pid="(MC\d+)"[^>]*>', re.I)
-_COLOR_SUFFIX = re.compile(r"\b([A-Z0-9]+-[A-Z0-9]+)-[A-Z]{1,3}\b")
-
-
-def parse_listing(src: str, base_url: str = BASE) -> list[dict]:
-    """カテゴリ一覧 (例: /TC1031, /gamepc-desk-f) の商品タイルを並び順どおりに返す。JavaScript 不要。"""
-    src = re.sub(r"<!--.*?-->", "", src, flags=re.S)
-    tiles = list(_TILE.finditer(src))
-    items = []
-    for i, t in enumerate(tiles):
-        end = tiles[i + 1].start() if i + 1 < len(tiles) else len(src)
-        chunk = src[t.end():end]
-        href = _first(r'<a\b[^>]*\bhref="([^"]*MC\d+[^"]*\.html)"', chunk)
-        if not href:
-            continue
-        pid = _first(r'class="productId"\s+value="([^"]+)"', chunk)
-        if pid and _MC_URL.search(href):
-            href = re.sub(r"MC\d+(-SN\d+)?\.html", pid + ".html", href)
-        name = _first(r'class="productName"\s+value="([^"]*)"', chunk)
-        name = html.unescape(name) if name else _text(_first(
-            r'p-products-all-item-product__name__text">(.*?)</p>', chunk) or "")
-        img = _first(r'<img\b[^>]*class="tile-image"[^>]*?\bsrc="([^"]+)"', chunk) or _first(
-            r'<img\b[^>]*\bsrc="([^"]+)"', chunk)
-        spec = {}
-        for k, v in re.findall(r"<th\b[^>]*>(.*?)</th>\s*<td\b[^>]*>(.*?)</td>", chunk, re.S):
-            spec[_text(k)] = _text(v)
-        stock = _text(_first(r'p-products-all-item-product__shipment">(.*?)</div>', chunk) or "")
-        items.append({
-            "url": urljoin(base_url, html.unescape(href)),
-            "name": name,
-            "image": html.unescape(img) if img else "",
-            "price": _to_int(_first(r'p-products-all-item-product__number">\s*([\d,]+)', chunk)),
-            "stock": stock,
-            "os": spec.get("OS", ""),
-            "cpu": spec.get("CPU", ""),
-            "video": spec.get("グラフィックス", ""),
-            "memory": spec.get("メモリ", ""),
-            "storage": spec.get("ストレージ", ""),
-            "benchmark": _to_int(spec.get("ベンチマーク")),
-            "tags": [_text(x) for x in re.findall(r'p-product-item__label--\d+">(.*?)</span>', chunk, re.S) if _text(x)],
-            "installment": None,
-        })
-    return items
-
-
-def _variant_key(name: str) -> str:
-    """色違い (…-B / …-W / …-GD / …-WL) を同じモデルとして扱うためのキー。"""
-    base = re.split(r"\s*『", name or "")[0]
-    return _COLOR_SUFFIX.sub(r"\1", base).strip()
-
-
-def rank_from_listing(items: list[dict], limit: int = 10) -> list[dict]:
-    """一覧の並び順を順位にする。色違いは上位のものだけ残す。"""
-    seen, out = set(), []
-    for it in items:
-        k = _variant_key(it["name"])
-        if k in seen:
-            continue
-        seen.add(k)
-        out.append(dict(it, rank=len(out) + 1))
-        if len(out) >= limit:
-            break
-    return out
-
-
-def _listing_urls(sec: dict) -> list[str]:
-    urls = []
-    if sec.get("category"):
-        urls.append(f"{BASE}/{sec['category']}")
-    if sec.get("more"):
-        m = sec["more"]
-        urls.append(m + ("&" if "?" in m else "?") + "srule=01")  # 人気の高い順
-    return urls
-
-
-def fill_sections(sections: list[dict], fetch=None) -> list[dict]:
-    """中身が空のランキング枠を、ランキング用カテゴリの一覧ページ (サーバー描画) から埋める。並列取得。"""
-    from concurrent.futures import ThreadPoolExecutor
-
-    fetch = fetch or fetch_html
-    todo = [s for s in sections if not s["items"]]
-
-    def fill(sec):
-        errors = []
-        for u in _listing_urls(sec):
-            try:
-                items = rank_from_listing(parse_listing(fetch(u), u))
-            except (FetchError, ParseError) as e:
-                errors.append(f"{u}: {e}")
-                continue
-            if items:
-                sec["items"], sec["source"] = items, u
-                return
-        sec["error"] = "; ".join(errors)
-
-    if todo:
-        with ThreadPoolExecutor(max_workers=min(6, len(todo))) as ex:
-            list(ex.map(fill, todo))
-    return [s for s in sections if s["items"]]
-
-
-def ranking_sections(url: str = "", src: str | None = None, fetch=None) -> tuple[list[dict], list[str]]:
-    """ランキングのあるページ → シリーズ別ランキング。
-
-    1. ページを普通に取得 (速い) → 描画済みのランキングがあればそのまま使う
-    2. 空の枠はランキング用カテゴリの一覧ページから埋める (JavaScript 不要)
-    3. それでも何も取れない時だけヘッドレスブラウザで描画して読む (遅い)
-
-    戻り値: (sections, warnings)  warnings = 取れなかったシリーズの説明
-    """
-    fetch = fetch or fetch_html
-    base = url or BASE
-    if src is None:
-        src = fetch(url)
-    try:
-        found = parse_ranking_sections(src, base)
-    except RankingNotRendered:
-        found = []
-    sections = fill_sections(found, fetch)
-    warnings = [f"{s['series']}: 取得できませんでした ({s.get('error') or '一覧が空'})" for s in found if not s["items"]]
-    if not sections:
-        # 枠の手がかりも無いページ: このページ自体の商品一覧を使う
-        items = rank_from_listing(parse_listing(src, base))
-        if items:
-            sections = [{"title": "人気ランキング", "series": "人気ランキング", "items": items, "source": base}]
-    if not sections and url:
-        sections = parse_ranking_sections(fetch_ranking_html(url), base)
-    return sections, warnings
 
 
 if __name__ == "__main__":

@@ -64,13 +64,13 @@ class Handler(BaseHTTPRequestHandler):
                 src = scraper.fetch_html(url)
                 return self._json(200, scraper.parse_product(src, url))
             if self.path == "/api/ranking":
-                # ページ内の「〜ランキング」をシリーズごとに返す (空の枠はランキング用カテゴリの一覧から埋める)
+                # ページ内の「〜ランキング」をシリーズごとに返す (ブラウザで表示し終わったページを読む)
                 url = (req.get("url") or "").strip()
-                sections, warnings = scraper.ranking_sections(url, req.get("html") or None)
+                src = req.get("html") or scraper.fetch_ranking_html(url)
+                sections = scraper.parse_ranking_sections(src, url or scraper.BASE)
                 if not sections:
-                    msg = "ページ内にランキングが見つかりませんでした"
-                    return self._json(422, {"error": msg + ("\n" + "\n".join(warnings) if warnings else "")})
-                return self._json(200, {"sections": sections, "warnings": warnings})
+                    return self._json(422, {"error": "ページ内にランキングが見つかりませんでした"})
+                return self._json(200, {"sections": sections})
             if self.path == "/api/parse":
                 # 取得がブロックされた時用: ブラウザで「ページのソース」を貼り付け
                 src = req.get("html") or ""
