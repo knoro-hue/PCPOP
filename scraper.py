@@ -711,11 +711,20 @@ def parse_ranking_sections(src: str, base_url: str = BASE) -> list[dict]:
             continue
         end = heads[i + 1].start() if i + 1 < len(heads) else len(src)
         region = src[h.end():end]
-        if _RANK_UL.search(region):
+        ul = _RANK_UL.search(region)
+        if ul:
             try:
                 items = parse_ranking(region, base_url)
             except RankingNotRendered:
                 items = []
+            if not items:
+                # JavaScript で中身を入れる枠: 中身の出どころ (ランキング用カテゴリ / 一覧ページ) を控えておく
+                cat = _first(r'data-categoryname="([^"]+)"', ul.group(0))
+                more = _first(r'class="more-link"[^>]*>\s*<a\b[^>]*\bhref="([^"]+)"', region)
+                if cat or more:
+                    sections.append({"title": title, "series": _series_name(title), "items": [],
+                                     "category": cat, "more": urljoin(base_url, html.unescape(more)) if more else None})
+                continue
         else:
             items = _parse_series_cards(region, base_url)
         if items:
@@ -726,6 +735,138 @@ def parse_ranking_sections(src: str, base_url: str = BASE) -> list[dict]:
         if items:
             sections.append({"title": "人気ランキング", "series": "人気ランキング", "items": items})
     return sections
+
+
+# ---------------------------------------------------------------- category listing (サーバー側で描画済みの商品一覧)
+
+_TILE = re.compile(r'<div\b[^>]*class="[^"]*\bp-products-all-item-product\b[^"]*"[^>]*\bdata-pid="(MC\d+)"[^>]*>', re.I)
+_COLOR_SUFFIX = re.compile(r"\b([A-Z0-9]+-[A-Z0-9]+)-[A-Z]{1,3}\b")
+
+
+def parse_listing(src: str, base_url: str = BASE) -> list[dict]:
+    """カテゴリ一覧 (例: /TC1031, /gamepc-desk-f) の商品タイルを並び順どおりに返す。JavaScript 不要。"""
+    src = re.sub(r"<!--.*?-->", "", src, flags=re.S)
+    tiles = list(_TILE.finditer(src))
+    items = []
+    for i, t in enumerate(tiles):
+        end = tiles[i + 1].start() if i + 1 < len(tiles) else len(src)
+        chunk = src[t.end():end]
+        href = _first(r'<a\b[^>]*\bhref="([^"]*MC\d+[^"]*\.html)"', chunk)
+        if not href:
+            continue
+        pid = _first(r'class="productId"\s+value="([^"]+)"', chunk)
+        if pid and _MC_URL.search(href):
+            href = re.sub(r"MC\d+(-SN\d+)?\.html", pid + ".html", href)
+        name = _first(r'class="productName"\s+value="([^"]*)"', chunk)
+        name = html.unescape(name) if name else _text(_first(
+            r'p-products-all-item-product__name__text">(.*?)</p>', chunk) or "")
+        img = _first(r'<img\b[^>]*class="tile-image"[^>]*?\bsrc="([^"]+)"', chunk) or _first(
+            r'<img\b[^>]*\bsrc="([^"]+)"', chunk)
+        spec = {}
+        for k, v in re.findall(r"<th\b[^>]*>(.*?)</th>\s*<td\b[^>]*>(.*?)</td>", chunk, re.S):
+            spec[_text(k)] = _text(v)
+        stock = _text(_first(r'p-products-all-item-product__shipment">(.*?)</div>', chunk) or "")
+        items.append({
+            "url": urljoin(base_url, html.unescape(href)),
+            "name": name,
+            "image": html.unescape(img) if img else "",
+            "price": _to_int(_first(r'p-products-all-item-product__number">\s*([\d,]+)', chunk)),
+            "stock": stock,
+            "os": spec.get("OS", ""),
+            "cpu": spec.get("CPU", ""),
+            "video": spec.get("グラフィックス", ""),
+            "memory": spec.get("メモリ", ""),
+            "storage": spec.get("ストレージ", ""),
+            "benchmark": _to_int(spec.get("ベンチマーク")),
+            "tags": [_text(x) for x in re.findall(r'p-product-item__label--\d+">(.*?)</span>', chunk, re.S) if _text(x)],
+            "installment": None,
+        })
+    return items
+
+
+def _variant_key(name: str) -> str:
+    """色違い (…-B / …-W / …-GD / …-WL) を同じモデルとして扱うためのキー。"""
+    base = re.split(r"\s*『", name or "")[0]
+    return _COLOR_SUFFIX.sub(r"\1", base).strip()
+
+
+def rank_from_listing(items: list[dict], limit: int = 10) -> list[dict]:
+    """一覧の並び順を順位にする。色違いは上位のものだけ残す。"""
+    seen, out = set(), []
+    for it in items:
+        k = _variant_key(it["name"])
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(dict(it, rank=len(out) + 1))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _listing_urls(sec: dict) -> list[str]:
+    urls = []
+    if sec.get("category"):
+        urls.append(f"{BASE}/{sec['category']}")
+    if sec.get("more"):
+        m = sec["more"]
+        urls.append(m + ("&" if "?" in m else "?") + "srule=01")  # 人気の高い順
+    return urls
+
+
+def fill_sections(sections: list[dict], fetch=None) -> list[dict]:
+    """中身が空のランキング枠を、ランキング用カテゴリの一覧ページ (サーバー描画) から埋める。並列取得。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    fetch = fetch or fetch_html
+    todo = [s for s in sections if not s["items"]]
+
+    def fill(sec):
+        errors = []
+        for u in _listing_urls(sec):
+            try:
+                items = rank_from_listing(parse_listing(fetch(u), u))
+            except (FetchError, ParseError) as e:
+                errors.append(f"{u}: {e}")
+                continue
+            if items:
+                sec["items"], sec["source"] = items, u
+                return
+        sec["error"] = "; ".join(errors)
+
+    if todo:
+        with ThreadPoolExecutor(max_workers=min(6, len(todo))) as ex:
+            list(ex.map(fill, todo))
+    return [s for s in sections if s["items"]]
+
+
+def ranking_sections(url: str = "", src: str | None = None, fetch=None) -> tuple[list[dict], list[str]]:
+    """ランキングのあるページ → シリーズ別ランキング。
+
+    1. ページを普通に取得 (速い) → 描画済みのランキングがあればそのまま使う
+    2. 空の枠はランキング用カテゴリの一覧ページから埋める (JavaScript 不要)
+    3. それでも何も取れない時だけヘッドレスブラウザで描画して読む (遅い)
+
+    戻り値: (sections, warnings)  warnings = 取れなかったシリーズの説明
+    """
+    fetch = fetch or fetch_html
+    base = url or BASE
+    if src is None:
+        src = fetch(url)
+    try:
+        found = parse_ranking_sections(src, base)
+    except RankingNotRendered:
+        found = []
+    sections = fill_sections(found, fetch)
+    warnings = [f"{s['series']}: 取得できませんでした ({s.get('error') or '一覧が空'})" for s in found if not s["items"]]
+    if not sections:
+        # 枠の手がかりも無いページ: このページ自体の商品一覧を使う
+        items = rank_from_listing(parse_listing(src, base))
+        if items:
+            sections = [{"title": "人気ランキング", "series": "人気ランキング", "items": items, "source": base}]
+    if not sections and url:
+        sections = parse_ranking_sections(fetch_ranking_html(url), base)
+    return sections, warnings
 
 
 if __name__ == "__main__":

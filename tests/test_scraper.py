@@ -179,5 +179,59 @@ class TestFetchSpeed(unittest.TestCase):
             scraper.render_html("https://example.com/")
 
 
+class TestRawTC30(unittest.TestCase):
+    """/TC30 の JavaScript 実行前のソース: ランキング枠は空 → ランキング用カテゴリの一覧ページから埋める。"""
+
+    def setUp(self):
+        d = Path(__file__).parent / "fixtures"
+        self.src = (d / "tc30_raw.html").read_text(encoding="utf-8")
+        self.listing = (d / "listing_f_series.html").read_text(encoding="utf-8")
+        self.calls = []
+
+    def fetch(self, url):
+        self.calls.append(url)
+        if url.endswith("/TC1031"):
+            return self.listing
+        raise scraper.FetchError("blocked")
+
+    def test_empty_frames_keep_category(self):
+        secs = scraper.parse_ranking_sections(self.src, "https://www.dospara.co.jp/TC30")
+        self.assertEqual([s["series"] for s in secs], ["Xシリーズ", "Fシリーズ（ピラーレス）", "Eシリーズ（Mini ITX）"])
+        self.assertEqual([s["category"] for s in secs], ["TC1030", "TC1031", "TC1032"])
+        self.assertEqual(secs[1]["more"], "https://www.dospara.co.jp/gamepc-desk-f")
+        self.assertTrue(all(s["items"] == [] for s in secs))
+
+    def test_fill_from_listing(self):
+        secs, warnings = scraper.ranking_sections("https://www.dospara.co.jp/TC30", self.src, fetch=self.fetch)
+        self.assertEqual([s["series"] for s in secs], ["Fシリーズ（ピラーレス）"])
+        self.assertEqual(len(warnings), 2)  # X / E は取得失敗として報告
+        items = secs[0]["items"]
+        self.assertEqual([i["rank"] for i in items], [1, 2, 3, 4])
+        # 色違い (-W) は上位の -B に統合
+        self.assertFalse(any("-W " in i["name"] for i in items))
+        first = items[0]
+        self.assertEqual(first["url"], "https://www.dospara.co.jp/TC30/MC25320-SN4902.html")
+        self.assertEqual(first["price"], 244980)
+        self.assertEqual(first["cpu"], "Ryzen 7 5700X")
+        self.assertEqual(first["video"], "GeForce RTX 5060 Ti 8GB")
+        self.assertEqual(first["memory"], "16GBメモリ DDR4")
+        self.assertEqual(first["storage"], "1TB Gen4 SSD")
+        self.assertEqual(first["benchmark"], 14522)
+        self.assertIn("『Minecraft", first["name"])
+        self.assertTrue(first["image"].endswith("case_sfm-b_main.png?sw=200"))
+        self.assertEqual(items[3]["stock"], "7日以内で出荷")
+        self.assertEqual(items[3]["tags"], ["半額で32GBメモリに変更可能"])
+
+    def test_falls_back_to_more_link(self):
+        def fetch(url):
+            if "gamepc-desk-f" in url:
+                self.assertIn("srule=01", url)
+                return self.listing
+            raise scraper.FetchError("blocked")
+        secs, _ = scraper.ranking_sections("https://www.dospara.co.jp/TC30", self.src, fetch=fetch)
+        self.assertEqual(secs[0]["source"], "https://www.dospara.co.jp/gamepc-desk-f?srule=01")
+        self.assertEqual(len(secs[0]["items"]), 4)
+
+
 if __name__ == "__main__":
     unittest.main()

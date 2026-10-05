@@ -58,8 +58,8 @@ function rowSpecs(s, detailed) {
   return [
     ["CPU", "cpu", get("CPU", c?.cpu)],
     ["グラフィックス", "gpu", get("GPU", c?.video)],
-    ["メモリ", "memory", get("メモリ")],
-    ["ストレージ", "storage", get("SSD")],
+    ["メモリ", "memory", get("メモリ", c?.memory?.replace("メモリ", " ").replace(/\s+/g, " ").trim())],
+    ["ストレージ", "storage", get("SSD", c?.storage)],
   ];
 }
 
@@ -260,14 +260,15 @@ $("#seriesSel").onchange = (e) => selectSection(Number(e.target.value));
 
 async function loadRanking(body) {
   const st = $("#rankStatus");
-  st.className = "status"; st.textContent = "ランキング取得中…（ブラウザでページを実行しています）";
+  st.className = "status"; st.textContent = "ランキング取得中…";
   try {
-    ({ sections } = await call("/api/ranking", body));
+    let warnings;
+    ({ sections, warnings = [] } = await call("/api/ranking", body));
     const sel = $("#seriesSel");
     sel.replaceChildren(...sections.map((s, i) => el("option", { value: String(i), text: `${s.series}（${s.items.length}件）` })));
     $("#seriesBox").hidden = false;
-    st.className = "status ok";
-    st.textContent = `${sections.length}シリーズのランキングを取得しました`;
+    st.className = warnings.length ? "status err" : "status ok";
+    st.textContent = `${sections.length}シリーズのランキングを取得しました` + warnings.map((w) => "\n⚠ " + w).join("");
     selectSection(0);
   } catch (e) {
     st.className = "status err";
