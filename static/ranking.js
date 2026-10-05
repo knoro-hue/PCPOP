@@ -59,26 +59,50 @@ function splitName(name) {
 }
 
 /* ------------------------------------------------------------ POP: header */
+let galleria = null;  // galleria.net のシリーズ画像 {X: {bg: {url|css}, pc}, ...}
+
+// 「Fシリーズ（ピラーレス）」→ letter "F" + tag「ピラーレス」
+function seriesInfo(sec) {
+  const m = (sec?.series || "").match(/^(.*?)\s*[（(](.+)[)）]\s*$/);
+  const main = m ? m[1] : sec?.series || "";
+  const sub = m ? m[2] : "";
+  const L = (main.match(/^([A-Z])\s*シリーズ$/i) || [])[1]?.toUpperCase() || "";
+  return { main, sub, L };
+}
+
 function renderHeader() {
   if (!section) return;
-  // 「Fシリーズ（ピラーレス）」→ 大見出し「Fシリーズ」+ タグ「ピラーレス」
-  const m = section.series.match(/^(.*?)\s*[（(](.+)[)）]\s*$/);
-  const main = m ? m[1] : section.series;
-  const sub = m ? m[2] : "";
-  $("#popSeries").textContent = main;
+  const { main, sub, L } = seriesInfo(section);
+  const ser = $("#popSeries");
+  ser.replaceChildren(...(L
+    ? [el("span", { class: "L", text: L }), el("span", { class: "S", text: "Series" })]
+    : [el("span", { class: "W", text: main })]));
   const tag = $("#popSeriesSub");
   tag.textContent = sub;
   tag.hidden = !sub;
   const first = section.items[0]?.name || "";
-  $("#popKicker").textContent = /^GALLERIA/i.test(first) ? "GALLERIA ゲーミングPC" : "ゲーミングPC";
+  $("#popKicker").textContent = /^GALLERIA/i.test(first) ? "GALLERIA GAMING PC" : "GAMING PC";
+  $("#rh").dataset.series = L || "other";
+  renderBackground();
   renderTopImage();
   fitSeries();
+}
+
+// 背景: galleria.net のシリーズ画像 (取れない時は同じ雰囲気のグラデーション)
+function renderBackground() {
+  const bgEl = $("#rhBg");
+  const { L } = seriesInfo(section);
+  const g = $("#optOfficialBg").checked && galleria?.[L];
+  bgEl.style.backgroundImage = "";
+  bgEl.classList.toggle("official", !!g?.bg);
+  if (g?.bg?.url) bgEl.style.backgroundImage = `url("${viaLocal(g.bg.url)}")`;
+  else if (g?.bg?.css) bgEl.style.backgroundImage = g.bg.css;
 }
 
 // シリーズ名を枠の幅に収まる最大サイズに
 function fitSeries() {
   const ser = $("#popSeries");
-  let mm = 24;
+  let mm = 30;
   ser.style.fontSize = mm + "mm";
   while (mm > 9 && ser.scrollWidth > ser.clientWidth + 1) {
     mm -= 0.5;
@@ -88,18 +112,34 @@ function fitSeries() {
 
 const sameImgs = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-// 画像の余白 (白・透明) を切り取る
+// 画像の白い背景を透明にして (外周からつながる白だけ)、余白を切り取る
 function trimImage(img) {
   const c = document.createElement("canvas");
   c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext("2d");
   g.drawImage(img, 0, 0);
-  const { data, width: w, height: h } = g.getImageData(0, 0, c.width, c.height);
+  const id = g.getImageData(0, 0, c.width, c.height);
+  const { data, width: w, height: h } = id;
+  const isBg = (p) => data[p * 4 + 3] < 16 || (data[p * 4] > 236 && data[p * 4 + 1] > 236 && data[p * 4 + 2] > 236);
+  const seen = new Uint8Array(w * h);
+  const q = new Int32Array(w * h);
+  let qh = 0, qt = 0;
+  const push = (p) => { if (!seen[p] && isBg(p)) { seen[p] = 1; q[qt++] = p; } };
+  for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+  while (qh < qt) {
+    const p = q[qh++], x = p % w;
+    data[p * 4 + 3] = 0;
+    if (x > 0) push(p - 1);
+    if (x < w - 1) push(p + 1);
+    if (p >= w) push(p - w);
+    if (p < w * (h - 1)) push(p + w);
+  }
+  g.putImageData(id, 0, 0);
   let x0 = w, y0 = h, x1 = -1, y1 = -1;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      if (data[i + 3] > 16 && !(data[i] > 242 && data[i + 1] > 242 && data[i + 2] > 242)) {
+      if (data[(y * w + x) * 4 + 3] > 16) {
         if (x < x0) x0 = x; if (x > x1) x1 = x;
         if (y < y0) y0 = y; if (y > y1) y1 = y;
       }
@@ -112,7 +152,7 @@ function trimImage(img) {
   return out;
 }
 
-const viaLocal = (u) => (/^(blob:|data:)/.test(u) ? u : "/img?u=" + encodeURIComponent(u));
+const viaLocal = (u) => (/^(blob:|data:|\/)/.test(u) ? u : "/img?u=" + encodeURIComponent(u));
 const loadImg = (u) => new Promise((ok, ng) => {
   const im = new Image();
   im.onload = () => ok(im); im.onerror = ng;
@@ -139,18 +179,16 @@ async function composeTop(urls) {
 let topToken = 0;
 async function renderTopImage() {
   const img = $("#popImg");
-  const box = $("#rhImg");
   $("#topThumbs").querySelectorAll(".th").forEach((x) => x.classList.toggle("sel", sameImgs(x._imgs, topImgs)));
   const token = ++topToken;
   if (!topImgs.length) { img.hidden = true; return; }
   try {
     const src = await composeTop(topImgs);
     if (token !== topToken) return;
-    img.src = src; img.hidden = false; box.classList.remove("raw");
+    img.src = src; img.hidden = false;
   } catch {
-    // 画像を中継できない時: そのまま1枚目を表示
     if (token !== topToken) return;
-    img.src = topImgs[0]; img.hidden = false; box.classList.add("raw");
+    img.src = topImgs[0]; img.hidden = false;  // 中継できない時はそのまま
   }
 }
 
@@ -163,27 +201,30 @@ function buildTopThumbs() {
   const opts = [];
   const add = (imgs, label) => {
     imgs = imgs.filter(Boolean);
-    if (imgs.length && !opts.some((o) => sameImgs(o.imgs, imgs))) opts.push({ imgs, label });
+    if (!opts.some((o) => sameImgs(o.imgs, imgs))) opts.push({ imgs, label });
   };
   for (const it of section?.items || []) {
     const pair = defaultTopImgs(it);
     if (pair.length === 2) add(pair, `${it.rank}位 ${(it.colors || []).join("＋") || "2色"}`);
   }
+  const g = galleria?.[seriesInfo(section).L];
+  if (g?.pc) add([g.pc], "公式サイトのPC");
   for (const it of section?.items || []) {
-    add([bigImage(it.image)], `${it.rank}位 ${it.colors?.[0] || ""}`);
-    add([bigImage(it.image2)], `${it.rank}位 ${it.colors?.[1] || ""}`);
+    if (it.image) add([bigImage(it.image)], `${it.rank}位 ${it.colors?.[0] || ""}`);
+    if (it.image2) add([bigImage(it.image2)], `${it.rank}位 ${it.colors?.[1] || ""}`);
   }
+  add([], "画像なし（背景のみ）");
   const box = $("#topThumbs");
   box.replaceChildren();
   for (const o of opts) {
-    const th = el("div", { class: "th" + (o.imgs.length > 1 ? " pair" : ""), title: o.label },
-      ...o.imgs.map((u) => el("img", { src: u, loading: "lazy", alt: "" })),
+    const th = el("div", { class: "th" + (o.imgs.length > 1 ? " pair" : "") + (o.imgs.length ? "" : " none"), title: o.label },
+      ...o.imgs.map((u) => el("img", { src: u.startsWith("http") && !/dospara/.test(u) ? viaLocal(u) : u, loading: "lazy", alt: "" })),
       el("span", { text: o.label }));
     th._imgs = o.imgs;
     th.onclick = () => { topImgs = o.imgs; renderTopImage(); };
     box.append(th);
   }
-  $("#imgBox").hidden = !opts.length;
+  $("#imgBox").hidden = !section;
   renderTopImage();
 }
 
@@ -191,6 +232,21 @@ $("#topImgFile").onchange = (e) => {
   const f = e.target.files[0];
   if (f) { topImgs = [URL.createObjectURL(f)]; renderTopImage(); }
 };
+
+// galleria.net のシリーズ画像を取得 (ランキング取得と並行。失敗しても POP は作れる)
+async function loadGalleria() {
+  const st = $("#galleriaStatus");
+  st.className = "status"; st.textContent = "galleria.net の背景画像を取得中…";
+  try {
+    ({ series: galleria } = await call("/api/galleria", {}));
+    st.className = "status ok"; st.textContent = `galleria.net の画像を取得しました（${Object.keys(galleria).join(" / ")} Series）`;
+  } catch (e) {
+    galleria = {};
+    st.className = "status err"; st.textContent = "galleria.net の画像を取得できませんでした（シリーズ別の色で表示します）: " + e.message;
+  }
+  renderBackground(); buildTopThumbs();
+}
+$("#optOfficialBg").onchange = renderBackground;
 
 /* ------------------------------------------------------------ POP: rank rows */
 // 王冠アイコン（色は段の --m1/--m2/--m3 = 金・銀・銅）
@@ -247,6 +303,13 @@ function renderRow(s) {
 
 // 段からはみ出す時は文字を少しずつ小さくする (スペックは改行して全部表示)
 function fitRow(row) {
+  // 価格は枠の幅に収まるサイズに
+  const amt = row.querySelector(".amt"), n = row.querySelector(".amt .n");
+  if (amt && n) {
+    let mm = 11.5;
+    n.style.fontSize = mm + "mm";
+    while (mm > 7 && amt.scrollWidth > amt.clientWidth + 1) { mm -= 0.25; n.style.fontSize = mm + "mm"; }
+  }
   let k = 1;
   row.style.setProperty("--k", k);
   while (k > 0.6 && row.scrollHeight > row.clientHeight + 1) {
@@ -259,6 +322,7 @@ const renderAll = () => slots.forEach(renderRow);
 document.fonts?.ready.then(() => { fitSeries(); slots.forEach((s) => fitRow($(`#row${s.i}`))); });
 $("#rows").addEventListener("input", (e) => { const r = e.target.closest(".rrow"); if (r) fitRow(r); });
 $("#popSeries").addEventListener("input", fitSeries);
+document.fonts?.load("900 italic 10mm Poppins").then(fitSeries);
 
 /* ------------------------------------------------------------ ranking / series */
 function renderCandidates() {
@@ -313,6 +377,7 @@ async function loadRanking(body) {
     st.className = "status ok";
     st.textContent = `${sections.length}シリーズのランキングを取得しました`;
     selectSection(0);
+    if (!galleria) loadGalleria();
   } catch (e) {
     st.className = "status err";
     st.textContent = "エラー: " + e.message;

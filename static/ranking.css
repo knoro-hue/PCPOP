@@ -39,65 +39,104 @@
 }
 
 /* ---------- POP ---------- */
+@font-face { font-family: "Poppins"; font-style: italic; font-weight: 600; src: url(fonts/poppins-latin-600-italic.woff2) format("woff2"); }
+@font-face { font-family: "Poppins"; font-style: italic; font-weight: 800; src: url(fonts/poppins-latin-800-italic.woff2) format("woff2"); }
+@font-face { font-family: "Poppins"; font-style: italic; font-weight: 900; src: url(fonts/poppins-latin-900-italic.woff2) format("woff2"); }
+@font-face { font-family: "Poppins"; font-style: normal; font-weight: 700; src: url(fonts/poppins-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "Poppins"; font-style: normal; font-weight: 800; src: url(fonts/poppins-latin-800-normal.woff2) format("woff2"); }
+
 .rpop {
-  --navy: #0a2a7a;
-  --navy2: #071a52;
+  --navy: #0d1d4f;
+  --navy2: #070d24;
   --yellow: #ffe600;
   --red: #e43344;
-  width: 210mm; height: 297mm; background: #eef2f8; position: relative; overflow: hidden;
+  --jp: "Hiragino Kaku Gothic StdN", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  --en: "Poppins", var(--jp);
+  width: 210mm; height: 297mm; position: relative; overflow: hidden;
   display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,.18);
-  font-family: "Hiragino Kaku Gothic StdN", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  font-family: var(--jp);
+  background:
+    linear-gradient(115deg, transparent 0 55%, rgba(120,170,255,.10) 55% 70%, transparent 70%),
+    linear-gradient(180deg, #0b1638 0%, #0a1230 60%, #081027 100%);
 }
 
-/* header: シリーズ名 + 画像 */
+/* header: galleria.net 風 (シリーズ画像の背景 + 白の英字シリーズ名 + PC画像) */
 .rh {
-  position: relative; height: 86mm; flex-shrink: 0; overflow: hidden; display: flex; align-items: center; gap: 4mm;
-  background: radial-gradient(ellipse at 30% 40%, #1d4fc4 0%, var(--navy) 55%, var(--navy2) 100%);
-  color: #fff; padding: 6mm 8mm 6mm 10mm; border-bottom: 2mm solid var(--yellow);
+  position: relative; height: 90mm; flex-shrink: 0; overflow: hidden; display: flex; align-items: center; gap: 2mm;
+  color: #fff; padding: 6mm 5mm 6mm 10mm; background: #0a1230;
 }
-.rh-rays {
-  position: absolute; inset: -40%;
-  background: repeating-conic-gradient(from 0deg at 35% 45%, rgba(255,255,255,.07) 0 6deg, transparent 6deg 14deg);
-  pointer-events: none;
+.rh-bg, .rh-grain { position: absolute; inset: 0; pointer-events: none; }
+.rh-bg { background-size: cover; background-position: center; }
+/* 公式画像が無い時のシリーズ別グラデーション (galleria.net の雰囲気) */
+.rh[data-series="S"] .rh-bg:not(.official) { background:
+  radial-gradient(ellipse 60% 70% at 85% 25%, rgba(196,120,255,.85), transparent 70%),
+  radial-gradient(ellipse 50% 60% at 60% 90%, rgba(60,90,255,.7), transparent 70%),
+  linear-gradient(125deg, #070b2a 0%, #18207a 55%, #4b2bb8 100%); }
+.rh[data-series="X"] .rh-bg:not(.official), .rh[data-series="other"] .rh-bg:not(.official) { background:
+  radial-gradient(ellipse 55% 75% at 78% 35%, rgba(205,240,40,.9), transparent 70%),
+  radial-gradient(ellipse 45% 60% at 95% 95%, rgba(0,200,190,.75), transparent 70%),
+  linear-gradient(120deg, #061033 0%, #0e2a74 50%, #1b5fa8 100%); }
+.rh[data-series="F"] .rh-bg:not(.official) { background:
+  radial-gradient(ellipse 55% 70% at 20% 10%, rgba(40,210,255,.85), transparent 70%),
+  radial-gradient(ellipse 55% 70% at 75% 40%, rgba(170,90,255,.7), transparent 70%),
+  linear-gradient(140deg, #0a5fa8 0%, #1d2a8a 55%, #0a0f3a 100%); }
+.rh[data-series="E"] .rh-bg:not(.official) { background:
+  radial-gradient(ellipse 70% 55% at 50% 105%, rgba(255,170,140,.95), transparent 70%),
+  radial-gradient(ellipse 60% 60% at 30% 60%, rgba(40,170,230,.8), transparent 70%),
+  linear-gradient(180deg, #06123f 0%, #0d3c8c 50%, #2b8fc9 100%); }
+/* 粒子感 + 文字側を少し暗く */
+.rh-grain {
+  background:
+    linear-gradient(90deg, rgba(4,8,30,.55) 0%, rgba(4,8,30,.15) 45%, transparent 65%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+  opacity: .9; mix-blend-mode: soft-light;
+}
+.rh::after {  /* 下端のアクセントライン */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.6mm;
+  background: linear-gradient(90deg, #2bd3ff, #8b5cff 45%, #d6f53c);
 }
 .rh-text { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .rh-kicker {
-  display: inline-block; font-size: 5mm; font-weight: 900; letter-spacing: .08em;
-  border-bottom: .6mm solid rgba(255,255,255,.6); padding-bottom: 1mm;
+  display: inline-flex; align-items: center; gap: 2mm; font-family: var(--en); font-size: 4mm; font-weight: 700;
+  letter-spacing: .28em; text-shadow: 0 .3mm 1mm rgba(0,0,0,.4);
 }
+.rh-kicker::before { content: ""; width: 7mm; height: .7mm; background: #fff; }
 .rh-series {
-  margin-top: 2mm; font-size: 20mm; font-weight: 900; line-height: 1.1; color: var(--yellow);
-  -webkit-text-stroke: 1.8mm var(--navy2); paint-order: stroke fill;
-  text-shadow: 1mm 1.2mm 0 rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; padding: 0 1mm;
+  margin-top: 1mm; font-family: var(--en); font-size: 30mm; line-height: 1; color: #fff;
+  text-shadow: 0 .8mm 3mm rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; padding: 1mm 2mm 2mm 0;
 }
+.rh-series .L { font-weight: 900; font-style: italic; letter-spacing: -.02em; }
+.rh-series .S { font-weight: 600; font-style: italic; font-size: .52em; margin-left: .14em; }
+.rh-series .W { font-family: var(--jp); font-weight: 900; font-size: .62em; }
 .rh-tag {
-  display: inline-block; margin-top: 2mm; background: #fff; color: var(--navy); font-size: 6mm; font-weight: 900;
-  padding: 1mm 4mm; border-radius: 1.5mm;
+  display: inline-block; margin-top: 1mm; color: #fff; font-size: 5mm; font-weight: 800; letter-spacing: .06em;
+  padding: .8mm 4mm; border: .4mm solid rgba(255,255,255,.85); border-radius: 10mm; background: rgba(255,255,255,.14);
 }
 .rh-ribbon {
-  display: flex; align-items: center; gap: 2mm; width: fit-content; margin-top: 3mm;
-  background: var(--red); color: #fff; font-size: 7.5mm; font-weight: 900; letter-spacing: .04em;
-  padding: 1.6mm 8mm 1.6mm 4mm; clip-path: polygon(0 0, 100% 0, calc(100% - 4mm) 50%, 100% 100%, 0 100%);
-  text-shadow: 0 .4mm 0 rgba(0,0,0,.25);
+  display: flex; align-items: center; gap: 2mm; width: fit-content; margin-top: 4mm;
+  background: linear-gradient(90deg, #ff3b55, #d9142f); color: #fff; font-size: 7mm; font-weight: 900; letter-spacing: .06em;
+  padding: 1.8mm 9mm 1.8mm 5mm; clip-path: polygon(2.5mm 0, 100% 0, calc(100% - 2.5mm) 100%, 0 100%);
+  box-shadow: 0 1mm 3mm rgba(0,0,0,.35);
 }
 .rh-ribbon .crown { color: var(--yellow); }
-.rh-img {
-  position: relative; z-index: 1; width: 92mm; height: 76mm; flex-shrink: 0;
-  background: #fff; border-radius: 4mm;
-  box-shadow: 0 0 0 1mm rgba(255,255,255,.35), 0 2mm 5mm rgba(0,0,0,.4);
+.rh-img { position: relative; z-index: 1; width: 96mm; height: 74mm; flex-shrink: 0; align-self: flex-end; margin-bottom: 1mm; }
+/* 白背景を抜いた2台重ねの画像を、影付きで背景の上に置く */
+.rh-img img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom;
+  filter: drop-shadow(0 2.5mm 3mm rgba(0,0,0,.45));
 }
-/* 2台を重ねた画像 (余白を切り取り済み) を枠いっぱいに */
-.rh-img img { position: absolute; inset: 4mm; width: calc(100% - 8mm); height: calc(100% - 8mm); object-fit: contain; }
 
 /* 1位〜3位の段 */
-.rows { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3mm; padding: 4mm 5mm; }
+.rows { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3mm; padding: 4.5mm 5mm 4mm; }
 .rrow {
   --m1: #ffe9a6; --m2: #e9b10f; --m3: #8a6200; --tint: #fffaf0;  /* 金 */
   flex: 1; min-height: 0; padding: 2.5mm 4mm 3mm 3mm;
   display: grid; grid-template-columns: 25mm minmax(0, 1fr) 54mm; grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas: "medal head head" "medal specs price"; column-gap: 3.5mm; row-gap: 1.8mm; align-items: center;
-  background: linear-gradient(90deg, var(--tint), #fff 35%); border-radius: 3mm;
-  border-left: 2.2mm solid var(--m2); box-shadow: 0 .6mm 1.6mm rgba(10,42,122,.18);
+  position: relative; border-radius: 2.5mm;
+  background: linear-gradient(100deg, var(--tint) 0%, #fff 30%, #fff 75%, #f3f6fb 100%);
+  box-shadow: 0 1mm 3mm rgba(0,0,0,.35), inset 0 .4mm 0 rgba(255,255,255,.9);
+  border-left: 2.4mm solid var(--m2);
 }
 .rrow.rank-2 { --m1: #ffffff; --m2: #b9c0ca; --m3: #5d6571; --tint: #f6f8fb; }  /* 銀 */
 .rrow.rank-3 { --m1: #ffe0c0; --m2: #c06f2e; --m3: #6e3a10; --tint: #fff6ef; }  /* 銅 */
@@ -111,7 +150,7 @@
 .medal .crown-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .medal .num {
   position: absolute; left: 0; right: 0; bottom: 2.3mm; display: flex; align-items: baseline; justify-content: center;
-  font-weight: 900; line-height: 1; color: #fff; -webkit-text-stroke: .9mm var(--m3); paint-order: stroke fill;
+  font-family: var(--en); font-style: italic; font-weight: 900; line-height: 1; color: #fff; -webkit-text-stroke: .9mm var(--m3); paint-order: stroke fill;
 }
 .medal .no { font-size: 9mm; letter-spacing: -.04em; }
 .medal .i { font-size: 4mm; margin-left: .3mm; }
@@ -124,26 +163,26 @@
   padding: .3mm 2mm; line-height: 1.3;
 }
 .rpop.no-tags .rhead .tags { display: none; }
-.rhead .name { font-size: calc(5.4mm * var(--k)); font-weight: 900; color: #111; line-height: 1.22; overflow-wrap: anywhere; }
+.rhead .name { font-family: var(--en); font-size: calc(5.4mm * var(--k)); font-weight: 800; color: #0b1330; line-height: 1.22; overflow-wrap: anywhere; }
 .rhead .edition { font-size: calc(2.8mm * var(--k)); color: #555; font-weight: bold; line-height: 1.3; margin-top: .4mm; }
 .rpop .specs { grid-area: specs; min-width: 0; align-self: center; display: flex; flex-direction: column; gap: calc(.9mm * var(--k));
   margin: 0; border: 0; overflow: visible; }  /* 個別POP (style.css) の .specs を打ち消す */
 .spec { display: flex; align-items: stretch; min-height: calc(6mm * var(--k)); }
 .spec .k {
-  width: 30mm; flex-shrink: 0; background: var(--navy); color: #fff; font-size: 2.9mm; font-weight: bold; white-space: nowrap; min-height: 6mm;
+  width: 30mm; flex-shrink: 0; background: linear-gradient(90deg, #0b1638, #1b3a8f); color: #fff; font-size: 2.9mm; font-weight: bold; white-space: nowrap; min-height: 6mm;
   display: flex; align-items: center; gap: 1.5mm; padding-left: 2mm; border-radius: 1mm 0 0 1mm;
   clip-path: polygon(0 0, 100% 0, calc(100% - 2mm) 100%, 0 100%);
 }
 .spec .k svg { width: 3.8mm; height: 3.8mm; fill: #fff; color: #fff; flex-shrink: 0; }
 .spec .v {
   flex: 1; min-width: 0; background: linear-gradient(90deg, #eef2f8, #fff); margin-left: -1mm;
-  padding: .7mm 2.5mm .7mm 3.5mm; display: flex; align-items: center; font-size: calc(3.8mm * var(--k)); font-weight: 800;
+  padding: .7mm 2.5mm .7mm 3.5mm; display: flex; align-items: center; font-family: var(--en); font-size: calc(3.8mm * var(--k)); font-weight: 700; color: #0b1330;
   line-height: 1.18; white-space: normal; overflow-wrap: anywhere;   /* 見切れずに改行 */
 }
 
 .pricebox {
   grid-area: price; align-self: stretch; min-height: 24mm; display: flex; flex-direction: column; justify-content: center;
-  background: #fff; border: .7mm solid var(--red); border-radius: 2.5mm; box-shadow: 0 .9mm 0 #b81d2c;
+  background: linear-gradient(180deg, #fff 60%, #fff3f4); border: .7mm solid var(--red); border-radius: 2.5mm; box-shadow: 0 .9mm 0 #b81d2c;
   padding: 2mm 3mm; position: relative; line-height: 1; margin: 1.5mm 0 .5mm;
 }
 .pricebox .stock {
@@ -154,17 +193,19 @@
   position: absolute; top: -.7mm; left: -.7mm; background: var(--red); color: #fff; font-size: 2.8mm; font-weight: 900;
   padding: .8mm 2.4mm; border-radius: 2.5mm 0 2.5mm 0;
 }
-.pricebox .amt { text-align: right; color: var(--red); font-weight: 900; white-space: nowrap; margin-top: 3mm; }
-.pricebox .y { font-size: 5.5mm; }
-.pricebox .n { font-size: 11mm; letter-spacing: -.03em; }
+.pricebox .amt { text-align: right; color: var(--red); white-space: nowrap; overflow: hidden; margin-top: 3mm; font-family: var(--en); font-style: italic; font-weight: 800; }
+.pricebox .y { font-size: 5.5mm; margin-right: .5mm; }
+.pricebox .n { font-size: 11.5mm; letter-spacing: -.02em; }
+.pricebox .t { font-style: normal; font-family: var(--jp); }
 .pricebox .t { font-size: 3mm; color: #333; margin-left: .8mm; }
 .pricebox .inst { text-align: right; font-size: 3mm; color: #333; font-weight: bold; margin-top: 1.6mm; }
-.pricebox .inst b { font-size: 4.2mm; color: var(--navy); }
+.pricebox .inst b { font-family: var(--en); font-size: 4.4mm; color: var(--navy); }
 
 /* footer */
 .rf {
   height: 23mm; flex-shrink: 0; position: relative;
-  background: radial-gradient(ellipse at 50% 0, #1d4fc4, var(--navy) 60%, var(--navy2));
+  background: linear-gradient(180deg, #0d1d4f, #060b20);
+  border-top: .8mm solid transparent; border-image: linear-gradient(90deg, #2bd3ff, #8b5cff 45%, #d6f53c) 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.5mm;
 }
 .rf-t { color: #fff; font-size: 6mm; font-weight: 900; text-shadow: 0 .5mm 1mm rgba(0,0,0,.4); }

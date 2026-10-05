@@ -55,6 +55,7 @@ class Handler(BaseHTTPRequestHandler):
             ".html": "text/html; charset=utf-8",
             ".css": "text/css; charset=utf-8",
             ".js": "application/javascript; charset=utf-8",
+            ".woff2": "font/woff2",
         }.get(f.suffix, "application/octet-stream")
         self._send(200, f.read_bytes(), ctype)
 
@@ -80,6 +81,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not sections:
                     return self._json(422, {"error": "ページ内にランキングが見つかりませんでした"})
                 return self._json(200, {"sections": sections})
+            if self.path == "/api/galleria":
+                # galleria.net のシリーズ紹介の背景・PC画像 (POP上部の背景に使う)
+                return self._json(200, {"series": scraper.galleria_series()})
             if self.path == "/api/parse":
                 # 取得がブロックされた時用: ブラウザで「ページのソース」を貼り付け
                 src = req.get("html") or ""

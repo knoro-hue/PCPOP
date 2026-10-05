@@ -40,7 +40,9 @@
 
   <section id="imgBox" hidden>
     <h2>トップ画像</h2>
-    <p class="hint">「黒＋白」はWEBと同じ2台並び。1枚だけにもできます。</p>
+    <p class="hint">「黒＋白」はWEBと同じ2台並び。背景は galleria.net のシリーズ画像を使います。</p>
+    <label><input type="checkbox" id="optOfficialBg" checked> 背景に GALLERIA 公式サイトの画像を使う</label>
+    <div id="galleriaStatus" class="status"></div>
     <div id="topThumbs" class="thumbs"></div>
     <input type="file" id="topImgFile" accept="image/*">
   </section>
@@ -70,11 +72,12 @@
 
 <main class="stage">
   <div id="pop" class="rpop">
-    <header class="rh">
-      <div class="rh-rays"></div>
+    <header class="rh" id="rh">
+      <div class="rh-bg" id="rhBg"></div>
+      <div class="rh-grain"></div>
       <div class="rh-text">
-        <div class="rh-kicker" id="popKicker" contenteditable="true">GALLERIA ゲーミングPC</div>
-        <div class="rh-series" id="popSeries" contenteditable="true">シリーズ名</div>
+        <div class="rh-kicker" id="popKicker" contenteditable="true">GALLERIA GAMING PC</div>
+        <div class="rh-series" id="popSeries" contenteditable="true"><span class="L">X</span><span class="S">Series</span></div>
         <div class="rh-tag" id="popSeriesSub" contenteditable="true" hidden></div>
         <div class="rh-ribbon"><span class="crown">♛</span><span contenteditable="true">おすすめランキング</span></div>
       </div>

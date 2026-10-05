@@ -26,6 +26,7 @@ from urllib.parse import urljoin, urlparse
 
 BASE = "https://www.dospara.co.jp"
 ALLOWED_HOSTS = {"www.dospara.co.jp", "dospara.co.jp"}
+IMAGE_HOSTS = ALLOWED_HOSTS | {"galleria.net", "www.galleria.net"}
 
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -109,7 +110,9 @@ _IMG_CACHE: dict[str, tuple[bytes, str]] = {}
 def fetch_image(url: str, timeout: int = 10) -> tuple[bytes, str]:
     """商品画像を取得 (POP 側で余白を切り取って重ねるため、ローカル経由で渡す)。"""
     global _DIRECT_OK
-    _check_host(url)
+    host = urlparse(url).hostname or ""
+    if host not in IMAGE_HOSTS:
+        raise FetchError(f"画像の取得元が対象外です: {host or url}")
     if url in _IMG_CACHE:
         return _IMG_CACHE[url]
     errors = []
@@ -317,19 +320,14 @@ class _WebSocket:
             pass
 
 
-def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45, _allow_any_host: bool = False) -> str:
-    """Edge/Chrome (画面なし) でページを開き、ready_js が true になる (= 表示し終わる) まで待ってから HTML を返す。
+from contextlib import contextmanager
 
-    ページの JavaScript をそのまま実行させるので、ブラウザで見えている内容と同じものが取れる。
-    """
+
+@contextmanager
+def _browser_page(timeout: float, images: bool = False):
+    """画面なしの Edge/Chrome を起動し、DevTools で操作できるページ (ws, 期限) を渡す。終わったら閉じる。"""
     import socket
 
-    if not _allow_any_host:
-        _check_host(url)
-    key = "ready:" + url
-    hit = _cached(key)
-    if hit is not None:
-        return hit
     exe = find_browser()
     if not exe:
         raise FetchError("Edge / Chrome が見つかりません（環境変数 PCPOP_BROWSER で場所を指定できます）")
@@ -340,13 +338,14 @@ def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45
     cmd = [
         exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
         "--disable-extensions", "--mute-audio", f"--user-data-dir={profile}", f"--user-agent={UA}",
-        "--blink-settings=imagesEnabled=false", f"--remote-debugging-port={port}",
-        "--remote-allow-origins=*", "about:blank",
+        f"--remote-debugging-port={port}", "--remote-allow-origins=*", "--window-size=1440,1000", "about:blank",
     ]
+    if not images:
+        cmd.insert(-1, "--blink-settings=imagesEnabled=false")
     if os.name != "nt" and hasattr(os, "geteuid") and os.geteuid() == 0:
         cmd.insert(1, "--no-sandbox")
     deadline = time.time() + timeout
-    with _BROWSER_LOCK:
+    with _BROWSER_LOCK:  # 同じプロファイルを同時に使わない
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         ws = None
@@ -364,26 +363,7 @@ def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45
             if not ws_url:
                 raise FetchError("ブラウザを起動できませんでした")
             ws = _WebSocket(ws_url, timeout=max(5, deadline - time.time()))
-            ws.call("Page.navigate", url=url)
-            ready = False
-            while time.time() < deadline:
-                time.sleep(0.4)
-                r = ws.call("Runtime.evaluate", expression=ready_js, returnByValue=True)
-                if r.get("result", {}).get("value") is True:
-                    ready = True
-                    break
-            if ready and ready_js is RANKING_READY_JS:
-                grace = min(deadline, time.time() + 5)
-                while time.time() < grace:
-                    r = ws.call("Runtime.evaluate", expression=INSTALLMENT_READY_JS, returnByValue=True)
-                    if r.get("result", {}).get("value") is True:
-                        break
-                    time.sleep(0.3)
-            loc = ws.call("Runtime.evaluate", expression="location.href", returnByValue=True).get("result", {}).get("value") or ""
-            if loc.startswith("chrome-error:") or loc == "about:blank":
-                raise FetchError("ブラウザでページを開けませんでした（ネットワークに接続できません）")
-            out = ws.call("Runtime.evaluate", expression="document.documentElement.outerHTML",
-                          returnByValue=True).get("result", {}).get("value") or ""
+            yield ws, deadline
         finally:
             if ws:
                 ws.close()
@@ -392,11 +372,122 @@ def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 pass
+
+
+def _eval(ws, expr: str):
+    return ws.call("Runtime.evaluate", expression=expr, returnByValue=True, awaitPromise=True).get("result", {}).get("value")
+
+
+def _wait(ws, deadline: float, expr: str, interval: float = 0.4) -> bool:
+    while time.time() < deadline:
+        if _eval(ws, expr) is True:
+            return True
+        time.sleep(interval)
+    return False
+
+
+def _check_loaded(ws):
+    loc = _eval(ws, "location.href") or ""
+    if loc.startswith("chrome-error:") or loc == "about:blank":
+        raise FetchError("ブラウザでページを開けませんでした（ネットワークに接続できません）")
+
+
+def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45, _allow_any_host: bool = False) -> str:
+    """Edge/Chrome (画面なし) でページを開き、ready_js が true になる (= 表示し終わる) まで待ってから HTML を返す。
+
+    ページの JavaScript をそのまま実行させるので、ブラウザで見えている内容と同じものが取れる。
+    """
+    if not _allow_any_host:
+        _check_host(url)
+    key = "ready:" + url
+    hit = _cached(key)
+    if hit is not None:
+        return hit
+    with _browser_page(timeout) as (ws, deadline):
+        ws.call("Page.navigate", url=url)
+        ready = _wait(ws, deadline, ready_js)
+        if ready and ready_js is RANKING_READY_JS:
+            _wait(ws, min(deadline, time.time() + 5), INSTALLMENT_READY_JS, 0.3)
+        _check_loaded(ws)
+        out = _eval(ws, "document.documentElement.outerHTML") or ""
     if "<html" not in out.lower() and "<head" not in out.lower():
         raise FetchError("ブラウザでページを開けませんでした")
     if not ready:
         return out  # 時間内に全部は出なかった: 出ている分で読む (キャッシュしない)
     return _store(key, out)
+
+
+# ---------------------------------------------------------------- GALLERIA 公式サイトのシリーズ画像
+
+GALLERIA_URL = "https://galleria.net/"
+
+# 「X Series」などの見出しを探し、そのカードの背景 (画像 or グラデーション) と一番大きい画像 (PC写真) を返す
+GALLERIA_EXTRACT_JS = r"""
+(async () => {
+  // 遅延読み込みの画像を出すため一度下までスクロール
+  for (let y = 0; y < document.body.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); }
+  window.scrollTo(0, 0);
+  await new Promise((r) => setTimeout(r, 800));
+  const abs = (u) => { try { return new URL(u, location.href).href; } catch (e) { return ''; } };
+  const imgUrl = (im) => abs(im.currentSrc || im.src || im.getAttribute('data-src') || (im.getAttribute('srcset') || '').split(' ')[0]);
+  const bgOf = (el) => {
+    const cs = getComputedStyle(el);
+    const m = cs.backgroundImage.match(/url\(["']?(.*?)["']?\)/);
+    if (m) return { url: abs(m[1]) };
+    if (cs.backgroundImage.includes('gradient')) return { css: cs.backgroundImage };
+    return null;
+  };
+  const out = {};
+  const all = [...document.querySelectorAll('body *')];
+  for (const L of ['S', 'X', 'F', 'E']) {
+    const re = new RegExp('^\\s*' + L + '\\s*Series\\s*$', 'i');
+    let h = all.find((e) => e.offsetWidth && re.test(e.innerText || '') && ![...e.children].some((c) => re.test(c.innerText || '')));
+    if (!h) h = [...document.images].find((i) => re.test(i.alt || ''));
+    if (!h) continue;
+    let card = null;
+    for (let a = h.parentElement; a && a !== document.body; a = a.parentElement) {
+      const r = a.getBoundingClientRect();
+      if (r.width >= 360 && r.height >= 240) { card = a; break; }
+    }
+    if (!card) continue;
+    const cr = card.getBoundingClientRect();
+    let bg = null;
+    for (const el of [card, ...card.querySelectorAll('*')]) {
+      const b = bgOf(el);
+      const r = el.getBoundingClientRect();
+      if (b && r.width >= cr.width * 0.8 && r.height >= cr.height * 0.8) { bg = b; break; }
+    }
+    const imgs = [...card.querySelectorAll('img')].filter((i) => i !== h && imgUrl(i))
+      .map((i) => ({ el: i, r: i.getBoundingClientRect() })).sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height);
+    let pc = null;
+    for (const x of imgs) {
+      const full = x.r.width >= cr.width * 0.9 && x.r.height >= cr.height * 0.9;
+      if (full && !bg) { bg = { url: imgUrl(x.el) }; continue; }  // カード全面の画像 = 背景
+      if (!full) { pc = imgUrl(x.el); break; }
+    }
+    const cs = getComputedStyle(h);
+    out[L] = { bg, pc, font: cs.fontFamily };
+  }
+  return JSON.stringify(out);
+})()
+"""
+
+_GALLERIA: dict = {}
+
+
+def galleria_series(timeout: float = 45) -> dict:
+    """galleria.net のシリーズ紹介 (S/X/F/E) の背景画像・PC画像。{"X": {"bg": {"url"|"css"}, "pc": url}, ...}"""
+    if _GALLERIA.get("data") and time.time() - _GALLERIA["t"] < 3600:
+        return _GALLERIA["data"]
+    with _browser_page(timeout, images=True) as (ws, deadline):
+        ws.call("Page.navigate", url=GALLERIA_URL)
+        _wait(ws, deadline, "location.href !== 'about:blank' && document.readyState === 'complete' && /Series/.test(document.body.innerText)")
+        _check_loaded(ws)
+        data = json.loads(_eval(ws, GALLERIA_EXTRACT_JS) or "{}")
+    if not data:
+        raise ParseError("galleria.net でシリーズ紹介 (〇 Series) が見つかりませんでした")
+    _GALLERIA.update(data=data, t=time.time())
+    return data
 
 
 def fetch_ranking_html(url: str) -> str:
