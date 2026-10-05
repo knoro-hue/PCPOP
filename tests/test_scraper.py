@@ -101,6 +101,35 @@ class TestRanking(unittest.TestCase):
         self.assertEqual(scraper.parse_ranking('<a href="/TC30/MC1.html">x</a>'), [])
 
 
+class TestSeriesRanking(unittest.TestCase):
+    """/TC30 のシリーズ別ランキング (画面キャプチャから再現した合成HTML)。"""
+
+    @classmethod
+    def setUpClass(cls):
+        src = (Path(__file__).parent / "fixtures" / "tc30_series_synthetic.html").read_text(encoding="utf-8")
+        cls.secs = scraper.parse_ranking_sections(src, "https://www.dospara.co.jp/TC30")
+
+    def test_sections(self):
+        self.assertEqual([s["series"] for s in self.secs], ["Fシリーズ（ピラーレス）", "Eシリーズ（Mini ITX）"])
+        self.assertEqual([len(s["items"]) for s in self.secs], [4, 3])
+
+    def test_cards(self):
+        f = self.secs[0]["items"]
+        self.assertEqual([i["url"].rsplit("/", 1)[1] for i in f],
+                         ["MC30001-SN1.html", "MC30002-SN1.html", "MC30003-SN1.html", "MC30004-SN1.html"])  # 色違いボタンは無視
+        self.assertEqual([i["price"] for i in f], [244980, 489980, 329980, 359980])  # 月々の価格は拾わない
+        self.assertEqual((f[1]["cpu"], f[1]["video"], f[1]["os"]), ("Ryzen 7 9800X3D", "GeForce RTX 5080 16GB", "Windows 11 Home"))
+        self.assertEqual(f[1]["name"], "GALLERIA FDR7A-R58-B Ryzen 7 9800X3D搭載モデル")
+        self.assertEqual(f[0]["installment"], {"monthly": 6800, "count": 36})
+        self.assertIn("case_fg_main.png", f[0]["image"])
+
+    def test_gamepc_block_becomes_one_section(self):
+        src = (Path(__file__).parent / "fixtures" / "gamepc_ranking.html").read_text(encoding="utf-8")
+        secs = scraper.parse_ranking_sections(src)
+        self.assertEqual(len(secs), 1)
+        self.assertEqual(len(secs[0]["items"]), 4)
+
+
 class TestErrors(unittest.TestCase):
     def setUp(self):
         scraper._CACHE.clear()

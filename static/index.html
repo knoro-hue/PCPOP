@@ -3,46 +3,55 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>人気ランキング POP</title>
+<title>シリーズ別ランキング POP</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="ranking.css">
 </head>
 <body>
 <aside class="panel">
-  <nav class="tabs"><a href="/" class="on">人気ランキングPOP</a><a href="/single.html">個別POP</a></nav>
+  <nav class="tabs"><a href="/" class="on">ランキングPOP</a><a href="/single.html">個別POP</a></nav>
 
   <section>
     <label class="lbl" for="catUrl">ランキングのあるページURL</label>
     <div class="row">
-      <input id="catUrl" type="url" value="https://www.dospara.co.jp/gamepc">
-      <button id="btnRank" class="primary">上位3件取得</button>
+      <input id="catUrl" type="url" value="https://www.dospara.co.jp/TC30">
+      <button id="btnRank" class="primary">ランキング取得</button>
     </div>
     <details id="catPaste">
-      <summary>取得できない場合: ランキングを貼り付け</summary>
-      <p class="hint">ランキングはブラウザ上で表示される仕組みのため、自動取得できないことがあります。次のどちらかでコピーして貼り付けてください。</p>
+      <summary>取得できない場合: ページを貼り付け</summary>
+      <p class="hint">ドスパラのページを開いた状態で、次のどちらかでページ全体をコピーして貼り付けてください。</p>
       <ol class="hint steps">
-        <li><b>コンソール</b>：ドスパラの /gamepc を開き F12 →「Console」に下のコードを貼って Enter（コピーされます）<br>
+        <li><b>コンソール</b>：F12 →「Console」に下のコードを貼って Enter（コピーされます）<br>
           <code id="copyCode"></code> <button id="btnCopyCode" type="button">コードをコピー</button></li>
-        <li><b>ブックマーク</b>：このボタンをブックマークバーへドラッグ → /gamepc でクリック<br>
-          <a id="bookmarklet" class="bm" href="#">ランキングをコピー</a></li>
+        <li><b>ブックマーク</b>：このボタンをブックマークバーへドラッグ → ドスパラのページでクリック<br>
+          <a id="bookmarklet" class="bm" href="#">ページをコピー</a></li>
       </ol>
-      <textarea id="catHtml" rows="4" placeholder="&lt;ul class=&quot;model-card-list --ranking ..."></textarea>
-      <button id="btnRankParse">貼り付けたHTMLからランキング取得</button>
+      <textarea id="catHtml" rows="4" placeholder="&lt;html&gt; ..."></textarea>
+      <button id="btnRankParse">貼り付けたページからランキング取得</button>
     </details>
     <div id="rankStatus" class="status"></div>
   </section>
 
-  <section id="candidates"></section>
+  <section id="seriesBox" hidden>
+    <label class="lbl" for="seriesSel">シリーズ</label>
+    <select id="seriesSel" class="wide-sel"></select>
+    <div id="candidates"></div>
+  </section>
 
   <section id="slots"></section>
+
+  <section id="imgBox" hidden>
+    <h2>トップ画像</h2>
+    <div id="topThumbs" class="thumbs"></div>
+    <input type="file" id="topImgFile" accept="image/*">
+  </section>
 
   <section>
     <h2>表示オプション</h2>
     <label><input type="checkbox" id="optPrice" checked> 価格（税込）</label>
-    <label><input type="checkbox" id="optRank" checked> 順位バッジ（人気 No.1〜3）</label>
-    <label><input type="checkbox" id="optModel" checked> 型番（モデル名）</label>
-    <label class="lbl" style="margin-top:8px">キャラクター画像（任意・透過PNG推奨）</label>
-    <input type="file" id="mascotFile" accept="image/*">
+    <label><input type="checkbox" id="optInstall" checked> 月々の分割価格</label>
+    <label><input type="checkbox" id="optStock" checked> 出荷目安</label>
+    <label><input type="checkbox" id="optDetail"> スペックを詳細表記にする</label>
     <label class="lbl" style="margin-top:8px" for="printMargin">印刷の余白（端が切れる場合は大きく）</label>
     <select id="printMargin">
       <option value="0">なし（フチなし印刷できるプリンター用）</option>
@@ -51,7 +60,7 @@
       <option value="8">8mm</option>
       <option value="10">10mm</option>
     </select>
-    <p class="hint">印刷ダイアログでは「倍率：100％（既定）」「余白：既定」「背景のグラフィック：ON」にしてください。</p>
+    <p class="hint">印刷ダイアログでは「倍率：既定」「余白：既定」「背景のグラフィック：ON」にしてください。</p>
     <p class="hint">POP上の文字はクリックで直接編集できます。</p>
   </section>
 
@@ -65,18 +74,17 @@
     <header class="rh">
       <div class="rh-rays"></div>
       <div class="rh-text">
-        <div class="rh-t1" contenteditable="true">今、選ばれている</div>
-        <div class="rh-t2" contenteditable="true">人気モデル</div>
-        <div class="rh-sub" contenteditable="true">ゲームも、配信も、クリエイティブも。<br>用途に合わせたおすすめモデルをご用意しています。</div>
+        <div class="rh-kicker" id="popKicker" contenteditable="true">GALLERIA ゲーミングPC</div>
+        <div class="rh-series" id="popSeries" contenteditable="true">シリーズ名</div>
+        <div class="rh-tag" id="popSeriesSub" contenteditable="true" hidden></div>
+        <div class="rh-ribbon"><span class="crown">♛</span><span contenteditable="true">おすすめランキング</span></div>
       </div>
-      <div class="rh-badge" contenteditable="true">初めての<br>ゲーミングPC<br>にもおすすめ!</div>
-      <img class="mascot mascot-head" alt="" hidden>
+      <div class="rh-img"><img id="popImg" alt="" hidden></div>
     </header>
 
-    <div class="cards" id="cards"></div>
+    <div class="rows" id="rows"></div>
 
     <footer class="rf">
-      <img class="mascot mascot-foot" alt="" hidden>
       <div class="rf-t" contenteditable="true">この他にも、さまざまなモデルをご用意しています！</div>
       <div class="rf-pill" contenteditable="true">詳しくはスタッフまでお気軽にご相談ください。</div>
     </footer>

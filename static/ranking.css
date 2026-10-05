@@ -1,204 +1,22 @@
-/* ===== 人気ランキングPOP (A4縦・3モデル) ===== */
-.panel h1 .nav { font-size: 11px; font-weight: normal; margin-left: 8px; color: var(--blue); }
-.slot { border: 1px solid #dde3ec; border-radius: 6px; padding: 8px; margin-bottom: 10px; }
-.slot h3 { margin: 0 0 6px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
-.slot select { font-size: 12px; padding: 3px; }
+/* ===== シリーズ別ランキングPOP (A4縦) ===== */
+
+/* ---------- panel ---------- */
+.slot { border: 1px solid #dde3ec; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+.slot h3 { margin: 0 0 6px; font-size: 13px; }
 .slot .status { margin-top: 4px; }
-.slot .pick { font-size: 11px; color: #555; margin: 6px 0 2px; }
-.slot .thumbs { grid-template-columns: repeat(6, 1fr); gap: 4px; }
-.slot input[type=file] { font-size: 11px; }
-
-.rpop {
-  --navy: #0a2a7a;
-  --navy2: #071a52;
-  --yellow: #ffe600;
-  width: 210mm; height: 297mm; background: #f3f6fb; position: relative; overflow: hidden;
-  display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,.18);
-  font-family: "Hiragino Kaku Gothic StdN", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
-}
-
-/* ---------- header ---------- */
-.rh {
-  position: relative; height: 72mm; flex-shrink: 0; overflow: hidden;
-  background: radial-gradient(ellipse at 30% 40%, #1d4fc4 0%, var(--navy) 55%, var(--navy2) 100%);
-  color: #fff; padding: 6mm 9mm 0;
-}
-.rh-rays {
-  position: absolute; inset: -40%;
-  background: repeating-conic-gradient(from 0deg at 35% 45%, rgba(255,255,255,.07) 0 6deg, transparent 6deg 14deg);
-  pointer-events: none;
-}
-.rh-text { position: relative; z-index: 1; }
-.rh-t1, .rh-t2 {
-  font-weight: 900; letter-spacing: -.02em; line-height: 1;
-  paint-order: stroke fill;
-}
-.rh-t1 {
-  font-size: 15mm; color: #fff; -webkit-text-stroke: 1.6mm var(--navy2);
-  transform: rotate(-3deg); transform-origin: left; display: inline-block;
-}
-.rh-t2 {
-  font-size: 25mm; color: var(--yellow); margin-top: 0;
-  -webkit-text-stroke: 2.2mm var(--navy2);
-  text-shadow: 1.2mm 1.4mm 0 rgba(0,0,0,.35);
-  transform: rotate(-3deg); transform-origin: left; display: inline-block;
-}
-.rh-sub {
-  margin-top: 2.5mm; font-size: 4.6mm; font-weight: 800; line-height: 1.4;
-  text-shadow: 0 .5mm 1mm rgba(0,0,0,.5);
-}
-.rh-badge {
-  position: absolute; z-index: 2; top: 6mm; right: 52mm;
-  background: var(--yellow); color: var(--navy2); font-weight: 900; font-size: 4.6mm; line-height: 1.25;
-  text-align: center; padding: 3mm 4.5mm; border-radius: 3mm; transform: rotate(-6deg);
-  box-shadow: 0 1mm 0 rgba(0,0,0,.25);
-}
-.mascot { position: absolute; z-index: 1; object-fit: contain; }
-.mascot-head { right: 2mm; bottom: 0; height: 68mm; max-width: 60mm; }
-.mascot-foot { left: 1mm; bottom: 0; height: 34mm; max-width: 34mm; }
-
-/* ---------- cards ---------- */
-.cards { flex: 1; display: flex; flex-direction: column; gap: 2.5mm; padding: 3.5mm 4mm 3mm; min-height: 0; }
-.card {
-  --c: #e6194b; --c-soft: #fdeef2;
-  flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column;
-  background: linear-gradient(100deg, #fff 0 55%, var(--c-soft) 100%);
-  border-radius: 3mm; box-shadow: 0 .6mm 1.6mm rgba(10,42,122,.18); overflow: hidden;
-}
-.card.empty { align-items: center; justify-content: center; color: #9aa6b8; font-size: 4mm; }
-.card.t-game { --c: #e6194b; --c-soft: #fdeef2; }
-.card.t-stream { --c: #1e6fe0; --c-soft: #e9f1fd; }
-.card.t-creative { --c: #18a03c; --c-soft: #e8f7ec; }
-
-.card-tab {
-  align-self: flex-start; display: flex; align-items: center; gap: 2.5mm;
-  background: var(--c); color: #fff; font-weight: 900; font-size: 6mm; letter-spacing: -.01em;
-  padding: 1.6mm 9mm 1.6mm 3mm; clip-path: polygon(0 0, 100% 0, calc(100% - 5mm) 100%, 0 100%);
-  white-space: nowrap; text-shadow: 0 .4mm 0 rgba(0,0,0,.2);
-}
-.card-tab .ico { width: 9mm; height: 7mm; background: #fff; border-radius: 1.5mm; display: grid; place-items: center; flex-shrink: 0; }
-.card-tab .ico svg { width: 5.5mm; height: 5.5mm; fill: var(--c); }
-.card-tab em { font-style: normal; color: var(--yellow); }
-
-.card-body { flex: 1; min-height: 0; display: flex; gap: 3mm; padding: 1.5mm 3mm 2.5mm; }
-/* PC画像: 白背景 */
-.card-case {
-  width: 38mm; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  background: #fff; border-radius: 2mm;
-}
-.card-case img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 1mm 1.2mm rgba(0,0,0,.22)); }
-
-.card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; }
-.card-title { font-size: 5.2mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; color: #111; line-height: 1.15; }
-.card-model { font-size: 2.7mm; color: #555; margin-top: .5mm; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-desc { font-size: 3.2mm; line-height: 1.35; margin: 1mm 0 1.4mm; color: #222; font-weight: 600; }
-.spec-rows { display: flex; flex-direction: column; gap: 1mm; }
-.spec-row { display: flex; align-items: stretch; height: 5.8mm; }
-.spec-row .k {
-  width: 30.5mm; flex-shrink: 0; background: var(--navy); color: #fff; font-size: 2.9mm; font-weight: bold; white-space: nowrap;
-  display: flex; align-items: center; gap: 1.5mm; padding-left: 2mm; border-radius: 1mm 0 0 1mm;
-  clip-path: polygon(0 0, 100% 0, calc(100% - 2mm) 100%, 0 100%);
-}
-.spec-row .k svg { width: 3.8mm; height: 3.8mm; fill: #fff; flex-shrink: 0; }
-.spec-row .v {
-  flex: 1; min-width: 0; background: linear-gradient(90deg, #eef2f8, #fff); margin-left: -1mm;
-  padding: 0 2.5mm 0 3.5mm; display: flex; align-items: center; font-size: 3.7mm; font-weight: 800;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-/* 右カラム: 上におすすめポイント、下に価格 + 順位バッジ */
-.card-side { width: 74mm; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 2mm; }
-
-.card-chips {
-  position: relative; background: #fff; border-radius: 2mm; box-shadow: 0 .3mm 1.2mm rgba(0,0,0,.15);
-  border: .4mm solid color-mix(in srgb, var(--c) 35%, transparent); padding: 3.4mm 1mm 1.2mm; margin-top: 2.4mm;
-}
-.card-chips .h {
-  position: absolute; top: -2.4mm; left: 2mm; background: var(--c); color: #fff; font-size: 3mm; font-weight: 900;
-  padding: .8mm 2.8mm; border-radius: 1.2mm; white-space: nowrap;
-}
-.chips { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; }
-.chip svg { width: 6.6mm; height: 6.6mm; fill: var(--c); color: var(--c); display: block; margin: 0 auto .6mm; }
-.chip div { font-size: 2.7mm; font-weight: 800; line-height: 1.15; white-space: pre-line; }
-
-.price-row { display: flex; align-items: center; gap: 2mm; }
-.card-price {
-  flex: 1; min-width: 0; background: #fff; border: .7mm solid #e43344; border-radius: 2mm;
-  box-shadow: 0 .8mm 0 #b81d2c; padding: 1.2mm 2mm 1.4mm; position: relative; line-height: 1;
-}
-.card-price .lbl {
-  position: absolute; top: -.7mm; left: -.7mm; background: #e43344; color: #fff; font-size: 2.6mm; font-weight: 900;
-  padding: .7mm 2mm; border-radius: 2mm 0 2mm 0;
-}
-.card-price .amt { text-align: right; color: #e43344; font-weight: 900; white-space: nowrap; margin-top: 2.6mm; }
-.card-price .y { font-size: 5mm; }
-.card-price .n { font-size: 10.5mm; letter-spacing: -.03em; }
-.card-price .t { font-size: 3mm; color: #333; margin-left: .8mm; }
-.card-price .inst { text-align: right; font-size: 2.8mm; color: #333; font-weight: bold; margin-top: 1mm; }
-.card-price .inst b { font-size: 3.8mm; color: var(--navy); }
-
-/* 順位バッジ: カード左上 / 1位 金・2位 銀・3位 銅 */
-.rank-badge {
-  position: absolute; z-index: 3; top: 1.2mm; left: 1.5mm; width: 17mm; height: 17mm; border-radius: 50%;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-weight: 900; line-height: 1; border: .7mm solid #fff;
-  box-shadow: 0 .7mm 1.4mm rgba(0,0,0,.35), inset 0 -1mm 1.5mm rgba(0,0,0,.18), inset 0 1mm 1.5mm rgba(255,255,255,.55);
-  background: #e8115b; color: #fff;
-}
-.rank-badge .crown { font-size: 3.2mm; }
-.rank-badge .a { font-size: 3.2mm; }
-.rank-badge .b { font-size: 5.8mm; letter-spacing: -.03em; }
-.rank-badge.rank-1 {
-  background: radial-gradient(circle at 32% 28%, #fff7c2 0%, #ffd84a 30%, #e9b10f 62%, #a87400 100%);
-  color: #5a3a00; text-shadow: 0 .3mm 0 rgba(255,255,255,.6);
-}
-.rank-badge.rank-1 .crown { color: #fff; text-shadow: 0 0 1mm #a87400; }
-.rank-badge.rank-2 {
-  background: radial-gradient(circle at 32% 28%, #ffffff 0%, #e6e9ee 30%, #b9c0ca 62%, #7d8591 100%);
-  color: #3a4250; text-shadow: 0 .3mm 0 rgba(255,255,255,.7);
-}
-.rank-badge.rank-2 .crown { color: #fff; text-shadow: 0 0 1mm #7d8591; }
-.rank-badge.rank-3 {
-  background: radial-gradient(circle at 32% 28%, #ffe0c0 0%, #e9a165 30%, #c06f2e 62%, #7e4214 100%);
-  color: #fff; text-shadow: 0 .3mm .6mm rgba(80,35,5,.8);
-}
-.rank-badge.rank-3 .crown { color: #ffe9c9; }
-/* バッジの分、見出しタブの文字を右へ */
-.card-tab { padding-left: 20.5mm; }
-.rpop.no-rank .card-tab { padding-left: 3mm; }
-
-/* ---------- footer ---------- */
-.rf {
-  height: 27mm; flex-shrink: 0; position: relative;
-  background: radial-gradient(ellipse at 50% 0, #1d4fc4, var(--navy) 60%, var(--navy2));
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.5mm;
-  padding-left: 30mm; padding-right: 6mm;
-}
-.rf-t { color: #fff; font-size: 6mm; font-weight: 900; text-shadow: 0 .5mm 1mm rgba(0,0,0,.4); }
-.rf-pill {
-  background: var(--yellow); color: var(--navy2); font-size: 6.4mm; font-weight: 900;
-  padding: 1.8mm 8mm; border-radius: 10mm; box-shadow: 0 .8mm 0 rgba(0,0,0,.3);
-}
-
-.rpop.no-price .card-price,
-.rpop.no-rank .rank-badge,
-.rpop.no-model .card-model { display: none; }
-
-@media print {
-  .rpop { box-shadow: none; }
-}
-
-/* ---------- candidates (panel) ---------- */
+.slot-title { font-weight: bold; }
+.wide-sel { width: 100%; padding: 6px; font-size: 13px; margin-bottom: 6px; }
+#topThumbs { grid-template-columns: repeat(5, 1fr); margin-bottom: 6px; }
 .cand {
   display: flex !important; align-items: center; gap: 6px; padding: 5px; border: 1px solid #e3e8f0;
   border-radius: 5px; margin: 4px 0 !important; cursor: pointer; font-size: 12px !important;
 }
 .cand.on { border-color: var(--blue); background: #eef4fd; }
 .cand img { width: 34px; height: 44px; object-fit: contain; flex-shrink: 0; }
-.cand-slot { width: 30px; flex-shrink: 0; font-size: 11px; font-weight: bold; color: var(--blue); }
+.cand-slot { width: 28px; flex-shrink: 0; font-size: 11px; font-weight: bold; color: var(--blue); }
 .cand-body { line-height: 1.35; min-width: 0; }
 .cand-body small { display: block; color: #666; }
 #candidates .wide { margin-top: 8px; }
-#candidates:empty { display: none; }
 .steps { padding-left: 18px; }
 .steps li { margin: 6px 0; }
 .steps code { display: block; background: #f3f3f3; padding: 4px; margin: 3px 0; font-size: 10px; word-break: break-all; }
@@ -206,4 +24,136 @@
   display: inline-block; margin-top: 3px; padding: 4px 10px; background: #ffe600; color: #071a52;
   border-radius: 12px; font-weight: bold; text-decoration: none; border: 1px solid #d6c000;
 }
-.slot-title { font-weight: bold; }
+
+/* ---------- POP ---------- */
+.rpop {
+  --navy: #0a2a7a;
+  --navy2: #071a52;
+  --yellow: #ffe600;
+  --red: #e43344;
+  width: 210mm; height: 297mm; background: #eef2f8; position: relative; overflow: hidden;
+  display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,.18);
+  font-family: "Hiragino Kaku Gothic StdN", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+}
+
+/* header: シリーズ名 + 画像 */
+.rh {
+  position: relative; height: 92mm; flex-shrink: 0; overflow: hidden; display: flex; align-items: center; gap: 4mm;
+  background: radial-gradient(ellipse at 30% 40%, #1d4fc4 0%, var(--navy) 55%, var(--navy2) 100%);
+  color: #fff; padding: 6mm 8mm 6mm 10mm; border-bottom: 2mm solid var(--yellow);
+}
+.rh-rays {
+  position: absolute; inset: -40%;
+  background: repeating-conic-gradient(from 0deg at 35% 45%, rgba(255,255,255,.07) 0 6deg, transparent 6deg 14deg);
+  pointer-events: none;
+}
+.rh-text { position: relative; z-index: 1; flex: 1; min-width: 0; }
+.rh-kicker {
+  display: inline-block; font-size: 5mm; font-weight: 900; letter-spacing: .08em;
+  border-bottom: .6mm solid rgba(255,255,255,.6); padding-bottom: 1mm;
+}
+.rh-series {
+  margin-top: 2mm; font-size: 20mm; font-weight: 900; line-height: 1.05; color: var(--yellow);
+  -webkit-text-stroke: 1.8mm var(--navy2); paint-order: stroke fill;
+  text-shadow: 1mm 1.2mm 0 rgba(0,0,0,.35); white-space: nowrap;
+}
+.rh-tag {
+  display: inline-block; margin-top: 2mm; background: #fff; color: var(--navy); font-size: 6mm; font-weight: 900;
+  padding: 1mm 4mm; border-radius: 1.5mm;
+}
+.rh-ribbon {
+  display: flex; align-items: center; gap: 2mm; width: fit-content; margin-top: 3mm;
+  background: var(--red); color: #fff; font-size: 7.5mm; font-weight: 900; letter-spacing: .04em;
+  padding: 1.6mm 8mm 1.6mm 4mm; clip-path: polygon(0 0, 100% 0, calc(100% - 4mm) 50%, 100% 100%, 0 100%);
+  text-shadow: 0 .4mm 0 rgba(0,0,0,.25);
+}
+.rh-ribbon .crown { color: var(--yellow); }
+.rh-img {
+  position: relative; z-index: 1; width: 74mm; height: 78mm; flex-shrink: 0;
+  background: #fff; border-radius: 4mm; display: flex; align-items: center; justify-content: center; padding: 3mm;
+  box-shadow: 0 0 0 1mm rgba(255,255,255,.35), 0 2mm 5mm rgba(0,0,0,.4);
+}
+.rh-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* 1位〜3位の段 */
+.rows { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3mm; padding: 4mm 5mm; }
+.rrow {
+  --m1: #ffe9a6; --m2: #e9b10f; --m3: #8a6200; --tint: #fffaf0;  /* 金 */
+  flex: 1; min-height: 0; display: flex; align-items: center; gap: 4mm; padding: 3mm 4mm 3mm 3mm;
+  background: linear-gradient(90deg, var(--tint), #fff 35%); border-radius: 3mm;
+  border-left: 2.2mm solid var(--m2); box-shadow: 0 .6mm 1.6mm rgba(10,42,122,.18);
+}
+.rrow.rank-2 { --m1: #ffffff; --m2: #b9c0ca; --m3: #5d6571; --tint: #f6f8fb; }  /* 銀 */
+.rrow.rank-3 { --m1: #ffe0c0; --m2: #c06f2e; --m3: #6e3a10; --tint: #fff6ef; }  /* 銅 */
+.rrow.rank-other { --m1: #ffd0de; --m2: #e8115b; --m3: #8a0a36; --tint: #fff4f7; }
+.rrow.empty { align-items: center; justify-content: center; color: #9aa6b8; font-size: 4mm; border-left-color: #ccd3de; }
+
+.medal {
+  width: 24mm; height: 24mm; flex-shrink: 0; border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, var(--m1) 0%, var(--m2) 55%, var(--m3) 100%);
+  border: .8mm solid #fff; box-shadow: 0 .8mm 1.6mm rgba(0,0,0,.35), inset 0 -1.2mm 2mm rgba(0,0,0,.2), inset 0 1.2mm 2mm rgba(255,255,255,.55);
+  display: flex; align-items: baseline; justify-content: center; position: relative; padding-top: 4mm;
+  color: #fff; font-weight: 900; line-height: 1; text-shadow: 0 .4mm .8mm rgba(0,0,0,.45);
+}
+.rrow.rank-1 .medal, .rrow.rank-2 .medal { color: #3d2a00; text-shadow: 0 .3mm 0 rgba(255,255,255,.7); }
+.rrow.rank-2 .medal { color: #2f3640; }
+.medal .crown { position: absolute; top: 2.2mm; left: 0; right: 0; text-align: center; font-size: 4.2mm; color: #fff; text-shadow: 0 0 1mm rgba(0,0,0,.4); }
+.medal .no { font-size: 12mm; letter-spacing: -.04em; }
+.medal .i { font-size: 4.5mm; margin-left: .3mm; }
+
+.info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1mm; }
+.info .name { font-size: 5mm; font-weight: 900; color: #111; line-height: 1.25; }
+.info .edition { font-size: 2.8mm; color: #555; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.specs { display: flex; flex-direction: column; gap: .9mm; margin-top: .8mm; }
+.spec { display: flex; align-items: stretch; height: 6mm; }
+.spec .k {
+  width: 30mm; flex-shrink: 0; background: var(--navy); color: #fff; font-size: 3mm; font-weight: bold; white-space: nowrap;
+  display: flex; align-items: center; gap: 1.5mm; padding-left: 2mm; border-radius: 1mm 0 0 1mm;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 2mm) 100%, 0 100%);
+}
+.spec .k svg { width: 3.8mm; height: 3.8mm; fill: #fff; color: #fff; flex-shrink: 0; }
+.spec .v {
+  flex: 1; min-width: 0; background: linear-gradient(90deg, #eef2f8, #fff); margin-left: -1mm;
+  padding: 0 2.5mm 0 3.5mm; display: flex; align-items: center; font-size: 3.8mm; font-weight: 800;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.pricebox {
+  width: 58mm; flex-shrink: 0; align-self: stretch; display: flex; flex-direction: column; justify-content: center;
+  background: #fff; border: .7mm solid var(--red); border-radius: 2.5mm; box-shadow: 0 .9mm 0 #b81d2c;
+  padding: 2mm 3mm; position: relative; line-height: 1; margin: 2mm 0;
+}
+.pricebox .stock {
+  position: absolute; top: -2.6mm; right: 3mm; background: var(--navy); color: #fff; font-size: 2.8mm; font-weight: 900;
+  padding: .8mm 2.4mm; border-radius: 1mm;
+}
+.pricebox .lbl {
+  position: absolute; top: -.7mm; left: -.7mm; background: var(--red); color: #fff; font-size: 2.8mm; font-weight: 900;
+  padding: .8mm 2.4mm; border-radius: 2.5mm 0 2.5mm 0;
+}
+.pricebox .amt { text-align: right; color: var(--red); font-weight: 900; white-space: nowrap; margin-top: 3mm; }
+.pricebox .y { font-size: 5.5mm; }
+.pricebox .n { font-size: 11.5mm; letter-spacing: -.03em; }
+.pricebox .t { font-size: 3mm; color: #333; margin-left: .8mm; }
+.pricebox .inst { text-align: right; font-size: 3mm; color: #333; font-weight: bold; margin-top: 1.6mm; }
+.pricebox .inst b { font-size: 4.2mm; color: var(--navy); }
+
+/* footer */
+.rf {
+  height: 26mm; flex-shrink: 0; position: relative;
+  background: radial-gradient(ellipse at 50% 0, #1d4fc4, var(--navy) 60%, var(--navy2));
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.5mm;
+}
+.rf-t { color: #fff; font-size: 6mm; font-weight: 900; text-shadow: 0 .5mm 1mm rgba(0,0,0,.4); }
+.rf-pill {
+  background: var(--yellow); color: var(--navy2); font-size: 6.4mm; font-weight: 900;
+  padding: 1.8mm 8mm; border-radius: 10mm; box-shadow: 0 .8mm 0 rgba(0,0,0,.3);
+}
+
+.rpop.no-price .pricebox,
+.rpop.no-inst .pricebox .inst,
+.rpop.no-stock .pricebox .stock { display: none; }
+
+@media print {
+  .rpop { box-shadow: none; }
+}

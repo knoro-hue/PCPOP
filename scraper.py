@@ -614,6 +614,120 @@ def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> l
     return items[:limit] if limit else items
 
 
+# ---------------------------------------------------------------- series rankings (例: /TC30)
+
+def _lines(fragment: str) -> list[str]:
+    """HTML 断片を「見た目の行」に分けたテキストにする (ブロック要素の区切りで改行)。"""
+    s = re.sub(r"(?is)<(script|style)\b.*?</\1>", "", fragment)
+    s = re.sub(r"(?i)<br\s*/?>|</(p|div|li|dt|dd|tr|td|th|h[1-6]|ul|dl|section|a|button)>", "\n", s)
+    s = re.sub(r"<[^>]+>", "", s)
+    s = html.unescape(s)
+    out = []
+    for ln in s.split("\n"):
+        ln = re.sub(r"[ \t　]+", " ", ln).strip()
+        if ln:
+            out.append(ln)
+    return out
+
+
+# 本体価格 "244,980円(税込)" (月々の "円(税込/36回払い)" は除外)
+_PRICE = re.compile(
+    r"(\d{1,3}(?:,\d{3})+)\s*(?:<[^>]+>\s*)*円\s*(?:<[^>]+>\s*)*[（(]\s*税込\s*[)）]"
+)
+_HEADING = re.compile(r"<(h[1-6])\b[^>]*>(.*?)</\1>", re.S | re.I)
+_A_TAG = re.compile(r'<a\b[^>]*\bhref="([^"]*?/(MC\d+)(?:-SN\d+)?\.html[^"]*)"[^>]*>(.*?)</a>', re.S | re.I)
+_IMG_SRC = re.compile(r'<img\b[^>]*\bsrc="([^"]+)"', re.I)
+_PRODUCT_IMG = re.compile(r"(/img/large/|/dw/image/|Sites-dospara-catalog)", re.I)
+_SPEC_LABELS = {"OS": "os", "GPU": "video", "CPU": "cpu"}
+
+
+def _series_name(title: str) -> str:
+    t = re.sub(r"(ゲーミング)?(PC|パソコン)?\s*(おすすめ|人気|売れ筋)?\s*ランキング.*$", "", title).strip()
+    return t or title
+
+
+def _parse_series_cards(region: str, base_url: str) -> list[dict]:
+    """価格を手がかりにカードを区切る。カード = [前の価格〜この価格] に名前・画像、[この価格〜次の価格] にスペック。"""
+    prices = list(_PRICE.finditer(region))
+    items = []
+    for k, pm in enumerate(prices):
+        start = prices[k - 1].end() if k else 0
+        end = prices[k + 1].start() if k + 1 < len(prices) else len(region)
+        before, after = region[start:pm.start()], region[pm.end():end]
+        links = list(_A_TAG.finditer(before))
+        if not links:
+            continue
+        main = links[-1]  # 価格の直前のリンク = このカードの商品 (前カードの色違いボタンより後ろ)
+        mc = main.group(2)
+        names = [_text(a.group(3)) for a in links if a.group(2) == mc]
+        alts = re.findall(r'alt="([^"]{6,})"', before)
+        cand = [n for n in names if len(n) >= 6] + [html.unescape(a) for a in alts[-2:]]
+        name = max(cand, key=len) if cand else ""
+        if not name:
+            g = [ln for ln in _lines(before) if re.match(r"(GALLERIA|THIRDWAVE|raytrek|Diginnos)", ln, re.I)]
+            name = g[-1] if g else ""
+        imgs = [u for u in _IMG_SRC.findall(before) if _PRODUCT_IMG.search(u)]
+        stock = [ln for ln in _lines(before) if "出荷" in ln and len(ln) <= 15]
+        spec = {"os": "", "video": "", "cpu": ""}
+        lines = _lines(after)
+        for i, ln in enumerate(lines):
+            m = re.match(r"^(OS|GPU|CPU)\s*[：:]?\s*(.*)$", ln)
+            if not m or spec[_SPEC_LABELS[m.group(1)]]:
+                continue
+            val = m.group(2).lstrip("：: ").strip()
+            if not val and i + 1 < len(lines):
+                val = lines[i + 1].lstrip("：: ").strip()
+            spec[_SPEC_LABELS[m.group(1)]] = val
+        joined = " ".join(lines)
+        mon = re.search(r"月々\s*([\d,]+)\s*円.*?(\d+)\s*回", joined)
+        items.append({
+            "rank": len(items) + 1,
+            "url": urljoin(base_url, html.unescape(main.group(1))),
+            "name": name,
+            "image": html.unescape(imgs[-1]) if imgs else "",
+            "price": _to_int(pm.group(1)),
+            "stock": stock[-1] if stock else "",
+            **spec,
+            "tags": [],
+            "installment": {"monthly": _to_int(mon.group(1)), "count": _to_int(mon.group(2))} if mon else None,
+        })
+    return items
+
+
+def parse_ranking_sections(src: str, base_url: str = BASE) -> list[dict]:
+    """ページ内の「〜ランキング」見出しごとにランキングを返す。
+
+    戻り値: [{"title": 見出し, "series": シリーズ名, "items": [...]}]
+    - /gamepc のような ul.model-card-list.--ranking はその構造で読む
+    - /TC30 のようなシリーズ別ランキングは、見出し〜次の見出しの範囲で価格を手がかりにカードを読む
+    """
+    src = re.sub(r"<!--.*?-->", "", src, flags=re.S)
+    src = re.sub(r"(?is)<(script|style|noscript)\b.*?</\1>", "", src)
+    heads = list(_HEADING.finditer(src))
+    sections = []
+    for i, h in enumerate(heads):
+        title = _text(h.group(2))
+        if "ランキング" not in title:
+            continue
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(src)
+        region = src[h.end():end]
+        if _RANK_UL.search(region):
+            try:
+                items = parse_ranking(region, base_url)
+            except RankingNotRendered:
+                items = []
+        else:
+            items = _parse_series_cards(region, base_url)
+        if items:
+            sections.append({"title": title, "series": _series_name(title), "items": items})
+    if not sections:
+        # 見出しが無い / 取れない場合: ランキング枠単体
+        items = parse_ranking(src, base_url)  # 未描画なら RankingNotRendered
+        if items:
+            sections.append({"title": "人気ランキング", "series": "人気ランキング", "items": items})
+    return sections
+
+
 if __name__ == "__main__":
     import sys
 
