@@ -38,8 +38,6 @@
     <div id="candidates"></div>
   </section>
 
-  <section id="slots"></section>
-
   <section id="imgBox" hidden>
     <h2>トップ画像</h2>
     <p class="hint">「黒＋白」はWEBと同じ2台並び。1枚だけにもできます。</p>
@@ -52,7 +50,7 @@
     <label><input type="checkbox" id="optPrice" checked> 価格（税込）</label>
     <label><input type="checkbox" id="optInstall" checked> 月々の分割価格</label>
     <label><input type="checkbox" id="optStock" checked> 出荷目安</label>
-    <label><input type="checkbox" id="optDetail"> スペックを詳細表記にする</label>
+    <label><input type="checkbox" id="optTags" checked> 訴求タグ（例: 32GBメモリへの変更が半額）</label>
     <label class="lbl" style="margin-top:8px" for="printMargin">印刷の余白（端が切れる場合は大きく）</label>
     <select id="printMargin">
       <option value="0">なし（フチなし印刷できるプリンター用）</option>
@@ -80,10 +78,7 @@
         <div class="rh-tag" id="popSeriesSub" contenteditable="true" hidden></div>
         <div class="rh-ribbon"><span class="crown">♛</span><span contenteditable="true">おすすめランキング</span></div>
       </div>
-      <div class="rh-img" id="rhImg">
-        <img id="popImg2" class="im2" alt="" hidden>
-        <img id="popImg" class="im1" alt="" hidden>
-      </div>
+      <div class="rh-img" id="rhImg"><img id="popImg" alt="" hidden></div>
     </header>
 
     <div class="rows" id="rows"></div>

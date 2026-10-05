@@ -103,6 +103,41 @@ def fetch_html(url: str, timeout: int = 8) -> str:
     raise FetchError("ページを取得できませんでした（" + " / ".join(errors) + "）")
 
 
+_IMG_CACHE: dict[str, tuple[bytes, str]] = {}
+
+
+def fetch_image(url: str, timeout: int = 10) -> tuple[bytes, str]:
+    """商品画像を取得 (POP 側で余白を切り取って重ねるため、ローカル経由で渡す)。"""
+    global _DIRECT_OK
+    _check_host(url)
+    if url in _IMG_CACHE:
+        return _IMG_CACHE[url]
+    errors = []
+    data = None
+    if _DIRECT_OK is not False:
+        try:
+            data, _ = _urllib_bytes(url, timeout, "image/*,*/*;q=0.8")
+            _DIRECT_OK = True
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"直接接続: {e}")
+            if _DIRECT_OK is None:
+                _DIRECT_OK = False
+    if data is None and os.name == "nt":
+        try:
+            data = _powershell_bytes(url, 30)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"Windowsプロキシ経由: {e}")
+    if data is None:
+        raise FetchError("画像を取得できませんでした（" + " / ".join(errors) + "）")
+    head = data[:16]
+    ctype = ("image/png" if head.startswith(b"\x89PNG") else "image/webp" if head[8:12] == b"WEBP"
+             else "image/gif" if head.startswith(b"GIF") else "image/jpeg")
+    if len(_IMG_CACHE) > 200:
+        _IMG_CACHE.clear()
+    _IMG_CACHE[url] = (data, ctype)
+    return data, ctype
+
+
 # ---------------------------------------------------------------- headless browser
 
 def find_browser() -> str | None:
@@ -181,6 +216,21 @@ RANKING_READY_JS = r"""
     const a = ul.querySelector('a[href*="/MC"]');
     const p = ul.querySelector('[data-key="amttaxnounit"]');
     return a && (!p || p.textContent.trim() !== '');
+  });
+})()
+"""
+
+
+# 月々の分割価格はランキング表示のさらに後 (約1秒後) に入る: 入るまで少しだけ待つ
+INSTALLMENT_READY_JS = r"""
+(() => {
+  const boxes = [...document.querySelectorAll('ul.model-card-list.--ranking .js-smbc-box')];
+  return !boxes.length || boxes.every((b) => {
+    const p = b.querySelector('.smbc_item_price');
+    const price = Number((p ? p.textContent : '').replace(/[^0-9]/g, ''));
+    if (price && price < 30000) return true;  // 3万円未満は分割表示なし
+    const s = b.querySelector('.SmbcAuto');
+    return s && s.textContent.trim() !== '';
   });
 })()
 """
@@ -322,6 +372,13 @@ def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45
                 if r.get("result", {}).get("value") is True:
                     ready = True
                     break
+            if ready and ready_js is RANKING_READY_JS:
+                grace = min(deadline, time.time() + 5)
+                while time.time() < grace:
+                    r = ws.call("Runtime.evaluate", expression=INSTALLMENT_READY_JS, returnByValue=True)
+                    if r.get("result", {}).get("value") is True:
+                        break
+                    time.sleep(0.3)
             loc = ws.call("Runtime.evaluate", expression="location.href", returnByValue=True).get("result", {}).get("value") or ""
             if loc.startswith("chrome-error:") or loc == "about:blank":
                 raise FetchError("ブラウザでページを開けませんでした（ネットワークに接続できません）")

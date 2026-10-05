@@ -37,6 +37,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]
+        if path == "/img":
+            # 商品画像の中継 (POP 側で余白を切り取って2台を重ねるため。ドスパラの画像のみ)
+            from urllib.parse import parse_qs, urlsplit
+            url = (parse_qs(urlsplit(self.path).query).get("u") or [""])[0]
+            try:
+                data, ctype = scraper.fetch_image(url)
+            except scraper.FetchError as e:
+                return self._send(502, str(e).encode(), "text/plain; charset=utf-8")
+            return self._send(200, data, ctype)
         if path == "/":
             path = "/index.html"
         f = (STATIC / path.lstrip("/")).resolve()

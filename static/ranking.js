@@ -30,6 +30,7 @@ const ICONS = {
   gpu: `<rect x="2" y="5" width="20" height="12" rx="1.5"/><circle cx="8.5" cy="11" r="3.4" fill="${NAVY}"/><circle cx="16.5" cy="11" r="2.4" fill="${NAVY}"/><path d="M4 17v3h7v-3" fill="none" stroke="currentColor" stroke-width="1.6"/>`,
   memory: `<rect x="2" y="6.5" width="20" height="9.5" rx="1"/><path d="M5 16v3M8 16v3M11 16v3M14 16v3M17 16v3M20 16v3" stroke="currentColor" stroke-width="1.5"/><rect x="4.5" y="9" width="3.5" height="4.5" fill="${NAVY}"/><rect x="10.3" y="9" width="3.5" height="4.5" fill="${NAVY}"/><rect x="16" y="9" width="3.5" height="4.5" fill="${NAVY}"/>`,
   storage: `<rect x="4" y="2.5" width="16" height="19" rx="2"/><rect x="7" y="15.5" width="10" height="3" rx="1" fill="${NAVY}"/>`,
+  os: `<rect x="3" y="3" width="8.5" height="8.5"/><rect x="12.5" y="3" width="8.5" height="8.5"/><rect x="3" y="12.5" width="8.5" height="8.5"/><rect x="12.5" y="12.5" width="8.5" height="8.5"/>`,
 };
 const svg = (name) => el("span", { html: `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>` }).firstChild;
 
@@ -40,26 +41,15 @@ let sections = [];   // [{title, series, items}]
 let section = null;  // 選択中のシリーズ
 let picked = [];     // POPに載せるランキング項目 (選択順・最大3)
 let topImgs = [];  // トップ画像 [手前, 奥] (黒＋白の2台並び or 1枚)
-const slots = [0, 1, 2].map((i) => ({ i, cand: null, data: null }));
+const slots = [0, 1, 2].map((i) => ({ i, cand: null }));
 
 /* ------------------------------------------------------------ spec helpers */
-function specFromData(d, label, detailed) {
-  const s = d.keySpecs.find((x) => x.label === label);
-  if (!s) return "";
-  if (detailed) return s.display;
-  let v = s.short || s.display;
-  if (label === "メモリ") v = v.replace("メモリ", " ").replace(/\s+/g, " ").trim();
-  return v;
-}
-
-function rowSpecs(s, detailed) {
-  const d = s.data, c = s.cand;
-  const get = (label, fromCand) => (d && specFromData(d, label, detailed)) || fromCand || "—";
+// ランキングページ (/TC30) に出ている情報だけを使う
+function rowSpecs(c) {
   return [
-    ["CPU", "cpu", get("CPU", c?.cpu)],
-    ["グラフィックス", "gpu", get("GPU", c?.video)],
-    ["メモリ", "memory", get("メモリ", c?.memory?.replace("メモリ", " ").replace(/\s+/g, " ").trim())],
-    ["ストレージ", "storage", get("SSD", c?.storage)],
+    ["CPU", "cpu", c.cpu || "—"],
+    ["グラフィックス", "gpu", c.video || "—"],
+    ["OS", "os", c.os || "—"],
   ];
 }
 
@@ -98,13 +88,70 @@ function fitSeries() {
 
 const sameImgs = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-function renderTopImage() {
-  const [a, b] = topImgs;
-  const i1 = $("#popImg"), i2 = $("#popImg2");
-  i1.hidden = !a; if (a) i1.src = a;
-  i2.hidden = !b; if (b) i2.src = b;
-  $("#rhImg").classList.toggle("pair", !!b);
+// 画像の余白 (白・透明) を切り取る
+function trimImage(img) {
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext("2d");
+  g.drawImage(img, 0, 0);
+  const { data, width: w, height: h } = g.getImageData(0, 0, c.width, c.height);
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3] > 16 && !(data[i] > 242 && data[i + 1] > 242 && data[i + 2] > 242)) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) return c;
+  const out = document.createElement("canvas");
+  out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+  out.getContext("2d").drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out;
+}
+
+const viaLocal = (u) => (/^(blob:|data:)/.test(u) ? u : "/img?u=" + encodeURIComponent(u));
+const loadImg = (u) => new Promise((ok, ng) => {
+  const im = new Image();
+  im.onload = () => ok(im); im.onerror = ng;
+  im.src = viaLocal(u);
+});
+
+// WEBのカードと同じ重ね方: 手前に1台目 (黒)、右奥に2台目 (白)。2台目は1台目の幅の82%右へずらす
+const OVERLAP_SHIFT = 0.82;
+async function composeTop(urls) {
+  const parts = (await Promise.all(urls.map(loadImg))).map(trimImage);
+  if (parts.length === 1) return parts[0].toDataURL("image/png");
+  let [a, b] = parts;
+  const sb = a.height / b.height;  // 高さをそろえる
+  const bw = b.width * sb, bh = a.height;
+  const off = a.width * OVERLAP_SHIFT;
+  const out = document.createElement("canvas");
+  out.width = Math.ceil(off + bw); out.height = a.height;
+  const g = out.getContext("2d");
+  g.drawImage(b, off, 0, bw, bh);
+  g.drawImage(a, 0, 0);
+  return out.toDataURL("image/png");
+}
+
+let topToken = 0;
+async function renderTopImage() {
+  const img = $("#popImg");
+  const box = $("#rhImg");
   $("#topThumbs").querySelectorAll(".th").forEach((x) => x.classList.toggle("sel", sameImgs(x._imgs, topImgs)));
+  const token = ++topToken;
+  if (!topImgs.length) { img.hidden = true; return; }
+  try {
+    const src = await composeTop(topImgs);
+    if (token !== topToken) return;
+    img.src = src; img.hidden = false; box.classList.remove("raw");
+  } catch {
+    // 画像を中継できない時: そのまま1枚目を表示
+    if (token !== topToken) return;
+    img.src = topImgs[0]; img.hidden = false; box.classList.add("raw");
+  }
 }
 
 function defaultTopImgs(c) {
@@ -126,7 +173,6 @@ function buildTopThumbs() {
     add([bigImage(it.image)], `${it.rank}位 ${it.colors?.[0] || ""}`);
     add([bigImage(it.image2)], `${it.rank}位 ${it.colors?.[1] || ""}`);
   }
-  for (const s of slots) if (s.data) s.data.images.forEach((u) => add([u], "商品ページ"));
   const box = $("#topThumbs");
   box.replaceChildren();
   for (const o of opts) {
@@ -173,28 +219,26 @@ function renderRow(s) {
   }
   const rank = c.rank;
   row.className = `rrow rank-${rank <= 3 ? rank : "other"}`;
-  const d = s.data;
-  const [model, edition] = d ? [d.model, d.edition] : splitName(c.name);
-  const price = d?.price ?? c.price;
-  const inst = d?.installment?.monthly ? d.installment : c.installment;
-  const stock = d?.stock || c.stock;
+  const [model, edition] = splitName(c.name);
 
   const medal = el("div", { class: "medal" });
   medal.innerHTML = crownSvg(s.i);
   medal.append(el("div", { class: "num" }, ed("span", "no", `${rank}`), el("span", { class: "i", text: "位" })));
 
   const specs = el("div", { class: "specs" },
-    ...rowSpecs(s, $("#optDetail").checked).map(([k, ic, v]) =>
+    ...rowSpecs(c).map(([k, ic, v]) =>
       el("div", { class: "spec" }, el("div", { class: "k" }, svg(ic), k), ed("div", "v", v))));
 
   const head = el("div", { class: "rhead" },
+    c.tags?.length ? el("div", { class: "tags" }, ...c.tags.map((t) => ed("span", "tag", t))) : null,
     ed("div", "name", model),
     edition ? ed("div", "edition", edition) : null);
 
+  const inst = c.installment;
   const priceBox = el("div", { class: "pricebox" },
-    stock ? ed("div", "stock", stock) : null,
+    c.stock ? ed("div", "stock", c.stock) : null,
     el("div", { class: "lbl", text: "販売価格" }),
-    el("div", { class: "amt" }, el("span", { class: "y", text: "¥" }), ed("span", "n", yen(price)), el("span", { class: "t", text: "税込" })),
+    el("div", { class: "amt" }, el("span", { class: "y", text: "¥" }), ed("span", "n", yen(c.price)), el("span", { class: "t", text: "税込" })),
     inst?.monthly ? el("div", { class: "inst" }, "月々 ", ed("b", "", yen(inst.monthly)), `円（${inst.count || 36}回）`) : null);
 
   row.append(medal, head, specs, priceBox);
@@ -215,49 +259,6 @@ const renderAll = () => slots.forEach(renderRow);
 document.fonts?.ready.then(() => { fitSeries(); slots.forEach((s) => fitRow($(`#row${s.i}`))); });
 $("#rows").addEventListener("input", (e) => { const r = e.target.closest(".rrow"); if (r) fitRow(r); });
 $("#popSeries").addEventListener("input", fitSeries);
-
-/* ------------------------------------------------------------ slots (商品ページ取得) */
-function buildSlotPanel(s) {
-  const box = el("div", { class: "slot", id: `slot${s.i}` });
-  const title = el("span", { class: "slot-title", text: `${s.i + 1}段目` });
-  const url = el("input", { type: "url", placeholder: "商品URL" });
-  const btn = el("button", { text: "取得" });
-  const status = el("div", { class: "status" });
-  const paste = el("textarea", { rows: "3", placeholder: "商品ページのソース (Ctrl+U)" });
-  const pbtn = el("button", { text: "貼り付けたHTMLを解析" });
-
-  const load = async (path, body) => {
-    btn.disabled = pbtn.disabled = true;
-    status.className = "status"; status.textContent = "取得中…";
-    try {
-      s.data = await call(path, body);
-      status.className = "status ok";
-      status.textContent = `✔ ${s.data.productId}  ¥${yen(s.data.price)}`;
-    } catch (e) {
-      s.data = null;
-      status.className = "status err";
-      status.textContent = `商品ページ未取得（${e.message}）\n→ ランキングの情報で表示中。メモリ・ストレージは「—」。ソース貼り付けで補完できます。`;
-    } finally {
-      btn.disabled = pbtn.disabled = false;
-      renderRow(s);
-      if (s.i === 0 && !topImgs.length && s.data?.images?.[0]) topImgs = [s.data.images[0]];
-      buildTopThumbs();
-    }
-  };
-  s.load = () => (url.value.trim() ? load("/api/fetch", { url: url.value.trim() }) : Promise.resolve());
-  s.setCand = (c) => {
-    s.cand = c; s.data = null;
-    url.value = c ? c.url : "";
-    title.textContent = c ? `${s.i + 1}段目：${c.rank}位` : `${s.i + 1}段目`;
-    status.textContent = "";
-  };
-  btn.onclick = s.load;
-  pbtn.onclick = () => load("/api/parse", { html: paste.value, url: url.value });
-
-  box.append(el("h3", {}, title), el("div", { class: "row" }, url, btn), status,
-    el("details", {}, el("summary", { text: "ソース貼り付け" }), paste, pbtn));
-  return box;
-}
 
 /* ------------------------------------------------------------ ranking / series */
 function renderCandidates() {
@@ -286,11 +287,10 @@ function renderCandidates() {
   box.append(go);
 }
 
-async function applyPicked() {
-  slots.forEach((s, i) => s.setCand(picked[i] || null));
+function applyPicked() {
+  slots.forEach((s, i) => (s.cand = picked[i] || null));
   topImgs = defaultTopImgs(picked[0]);
   renderHeader(); renderAll(); buildTopThumbs();
-  await Promise.all(slots.filter((s) => s.cand).map((s) => s.load()));  // 3商品を並列取得
 }
 
 function selectSection(i) {
@@ -332,11 +332,8 @@ $("#btnCopyCode").onclick = () => navigator.clipboard.writeText(COPY_JS).then(()
 
 /* ------------------------------------------------------------ init */
 const rows = $("#rows");
-const slotsBox = $("#slots");
-slotsBox.append(el("h2", { text: "各段の商品ページ（メモリ・ストレージ取得用）" }));
 for (const s of slots) {
   rows.append(el("div", { id: `row${s.i}` }));
-  slotsBox.append(buildSlotPanel(s));
   renderRow(s);
 }
 
@@ -345,7 +342,7 @@ const opt = (id, cls) => { const cb = $("#" + id); cb.onchange = () => pop.class
 opt("optPrice", "no-price");
 opt("optInstall", "no-inst");
 opt("optStock", "no-stock");
-$("#optDetail").onchange = renderAll;
+opt("optTags", "no-tags");
 $("#btnPrint").onclick = () => window.print();
 
 // 印刷余白: @page の余白を設定し、POP全体をその内側に収まるよう縮小

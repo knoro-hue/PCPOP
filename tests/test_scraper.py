@@ -198,6 +198,7 @@ class TestTC30Rendered(unittest.TestCase):
         self.assertEqual(f[0]["cpu"], "Ryzen 7 5700X")
         self.assertEqual(f[0]["video"], "GeForce RTX 5060 Ti 8GB")
         self.assertEqual(f[0]["stock"], "翌日出荷")
+        self.assertEqual(f[0]["installment"], {"monthly": 6800, "count": 36})
         # 白モデル (data-ranking=5〜8 の <object>) は順位に混ざらず、色違いとして付く
         self.assertFalse(any("-W " in i["name"] for i in f))
         self.assertEqual(f[0]["colors"], ["ブラック", "ホワイト"])
