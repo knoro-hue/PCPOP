@@ -39,7 +39,7 @@ const bigImage = (u) => (u || "").replace(/([?&])sw=\d+/, "$1sw=1200");
 let sections = [];   // [{title, series, items}]
 let section = null;  // 選択中のシリーズ
 let picked = [];     // POPに載せるランキング項目 (選択順・最大3)
-let topImg = "";
+let topImgs = [];  // トップ画像 [手前, 奥] (黒＋白の2台並び or 1枚)
 const slots = [0, 1, 2].map((i) => ({ i, cand: null, data: null }));
 
 /* ------------------------------------------------------------ spec helpers */
@@ -75,44 +75,75 @@ function renderHeader() {
   const m = section.series.match(/^(.*?)\s*[（(](.+)[)）]\s*$/);
   const main = m ? m[1] : section.series;
   const sub = m ? m[2] : "";
-  const ser = $("#popSeries");
-  ser.textContent = main;
-  ser.style.fontSize = `${Math.max(11, Math.min(24, 120 / Math.max(main.length, 4)))}mm`;
+  $("#popSeries").textContent = main;
   const tag = $("#popSeriesSub");
   tag.textContent = sub;
   tag.hidden = !sub;
   const first = section.items[0]?.name || "";
   $("#popKicker").textContent = /^GALLERIA/i.test(first) ? "GALLERIA ゲーミングPC" : "ゲーミングPC";
   renderTopImage();
+  fitSeries();
 }
 
+// シリーズ名を枠の幅に収まる最大サイズに
+function fitSeries() {
+  const ser = $("#popSeries");
+  let mm = 24;
+  ser.style.fontSize = mm + "mm";
+  while (mm > 9 && ser.scrollWidth > ser.clientWidth + 1) {
+    mm -= 0.5;
+    ser.style.fontSize = mm + "mm";
+  }
+}
+
+const sameImgs = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
 function renderTopImage() {
-  const img = $("#popImg");
-  img.hidden = !topImg;
-  if (topImg) img.src = topImg;
-  $("#topThumbs").querySelectorAll("img").forEach((x) => x.classList.toggle("sel", x.dataset.u === topImg));
+  const [a, b] = topImgs;
+  const i1 = $("#popImg"), i2 = $("#popImg2");
+  i1.hidden = !a; if (a) i1.src = a;
+  i2.hidden = !b; if (b) i2.src = b;
+  $("#rhImg").classList.toggle("pair", !!b);
+  $("#topThumbs").querySelectorAll(".th").forEach((x) => x.classList.toggle("sel", sameImgs(x._imgs, topImgs)));
+}
+
+function defaultTopImgs(c) {
+  if (!c) return [];
+  return [bigImage(c.image), bigImage(c.image2)].filter((u, i, arr) => u && arr.indexOf(u) === i);
 }
 
 function buildTopThumbs() {
-  const urls = [];
-  const add = (u) => { if (u && !urls.includes(u)) urls.push(u); };
-  for (const s of slots) if (s.data) s.data.images.forEach(add);
-  for (const it of section?.items || []) add(bigImage(it.image));
+  const opts = [];
+  const add = (imgs, label) => {
+    imgs = imgs.filter(Boolean);
+    if (imgs.length && !opts.some((o) => sameImgs(o.imgs, imgs))) opts.push({ imgs, label });
+  };
+  for (const it of section?.items || []) {
+    const pair = defaultTopImgs(it);
+    if (pair.length === 2) add(pair, `${it.rank}位 ${(it.colors || []).join("＋") || "2色"}`);
+  }
+  for (const it of section?.items || []) {
+    add([bigImage(it.image)], `${it.rank}位 ${it.colors?.[0] || ""}`);
+    add([bigImage(it.image2)], `${it.rank}位 ${it.colors?.[1] || ""}`);
+  }
+  for (const s of slots) if (s.data) s.data.images.forEach((u) => add([u], "商品ページ"));
   const box = $("#topThumbs");
   box.replaceChildren();
-  for (const u of urls) {
-    const im = el("img", { src: u, loading: "lazy" });
-    im.dataset.u = u;
-    im.onclick = () => { topImg = u; renderTopImage(); };
-    box.append(im);
+  for (const o of opts) {
+    const th = el("div", { class: "th" + (o.imgs.length > 1 ? " pair" : ""), title: o.label },
+      ...o.imgs.map((u) => el("img", { src: u, loading: "lazy", alt: "" })),
+      el("span", { text: o.label }));
+    th._imgs = o.imgs;
+    th.onclick = () => { topImgs = o.imgs; renderTopImage(); };
+    box.append(th);
   }
-  $("#imgBox").hidden = !urls.length;
+  $("#imgBox").hidden = !opts.length;
   renderTopImage();
 }
 
 $("#topImgFile").onchange = (e) => {
   const f = e.target.files[0];
-  if (f) { topImg = URL.createObjectURL(f); renderTopImage(); }
+  if (f) { topImgs = [URL.createObjectURL(f)]; renderTopImage(); }
 };
 
 /* ------------------------------------------------------------ POP: rank rows */
@@ -156,10 +187,9 @@ function renderRow(s) {
     ...rowSpecs(s, $("#optDetail").checked).map(([k, ic, v]) =>
       el("div", { class: "spec" }, el("div", { class: "k" }, svg(ic), k), ed("div", "v", v))));
 
-  const info = el("div", { class: "info" },
+  const head = el("div", { class: "rhead" },
     ed("div", "name", model),
-    edition ? ed("div", "edition", edition) : null,
-    specs);
+    edition ? ed("div", "edition", edition) : null);
 
   const priceBox = el("div", { class: "pricebox" },
     stock ? ed("div", "stock", stock) : null,
@@ -167,10 +197,24 @@ function renderRow(s) {
     el("div", { class: "amt" }, el("span", { class: "y", text: "¥" }), ed("span", "n", yen(price)), el("span", { class: "t", text: "税込" })),
     inst?.monthly ? el("div", { class: "inst" }, "月々 ", ed("b", "", yen(inst.monthly)), `円（${inst.count || 36}回）`) : null);
 
-  row.append(medal, info, priceBox);
+  row.append(medal, head, specs, priceBox);
+  fitRow(row);
+}
+
+// 段からはみ出す時は文字を少しずつ小さくする (スペックは改行して全部表示)
+function fitRow(row) {
+  let k = 1;
+  row.style.setProperty("--k", k);
+  while (k > 0.6 && row.scrollHeight > row.clientHeight + 1) {
+    k = Math.round((k - 0.04) * 100) / 100;
+    row.style.setProperty("--k", k);
+  }
 }
 
 const renderAll = () => slots.forEach(renderRow);
+document.fonts?.ready.then(() => { fitSeries(); slots.forEach((s) => fitRow($(`#row${s.i}`))); });
+$("#rows").addEventListener("input", (e) => { const r = e.target.closest(".rrow"); if (r) fitRow(r); });
+$("#popSeries").addEventListener("input", fitSeries);
 
 /* ------------------------------------------------------------ slots (商品ページ取得) */
 function buildSlotPanel(s) {
@@ -196,7 +240,7 @@ function buildSlotPanel(s) {
     } finally {
       btn.disabled = pbtn.disabled = false;
       renderRow(s);
-      if (s.i === 0 && !topImg && s.data?.images?.[0]) topImg = s.data.images[0];
+      if (s.i === 0 && !topImgs.length && s.data?.images?.[0]) topImgs = [s.data.images[0]];
       buildTopThumbs();
     }
   };
@@ -244,7 +288,7 @@ function renderCandidates() {
 
 async function applyPicked() {
   slots.forEach((s, i) => s.setCand(picked[i] || null));
-  topImg = picked[0] ? bigImage(picked[0].image) : "";
+  topImgs = defaultTopImgs(picked[0]);
   renderHeader(); renderAll(); buildTopThumbs();
   await Promise.all(slots.filter((s) => s.cand).map((s) => s.load()));  // 3商品を並列取得
 }

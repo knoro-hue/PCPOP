@@ -198,8 +198,12 @@ class TestTC30Rendered(unittest.TestCase):
         self.assertEqual(f[0]["cpu"], "Ryzen 7 5700X")
         self.assertEqual(f[0]["video"], "GeForce RTX 5060 Ti 8GB")
         self.assertEqual(f[0]["stock"], "翌日出荷")
-        # 白モデル (data-ranking=5〜8 の <object>) は順位に混ざらない
+        # 白モデル (data-ranking=5〜8 の <object>) は順位に混ざらず、色違いとして付く
         self.assertFalse(any("-W " in i["name"] for i in f))
+        self.assertEqual(f[0]["colors"], ["ブラック", "ホワイト"])
+        self.assertTrue(f[0]["image"].endswith("case_sfm-b_main.png?sw=400"))
+        self.assertTrue(f[0]["image2"].endswith("case_sfm-w_main.png?sw=400"))
+        self.assertEqual(f[0]["url2"], "https://www.dospara.co.jp/TC30/MC25320-SN4902.html")
 
     def test_raw_source_is_reported_as_not_rendered(self):
         with self.assertRaises(scraper.RankingNotRendered):

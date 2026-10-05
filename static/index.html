@@ -42,6 +42,7 @@
 
   <section id="imgBox" hidden>
     <h2>トップ画像</h2>
+    <p class="hint">「黒＋白」はWEBと同じ2台並び。1枚だけにもできます。</p>
     <div id="topThumbs" class="thumbs"></div>
     <input type="file" id="topImgFile" accept="image/*">
   </section>
@@ -79,7 +80,10 @@
         <div class="rh-tag" id="popSeriesSub" contenteditable="true" hidden></div>
         <div class="rh-ribbon"><span class="crown">♛</span><span contenteditable="true">おすすめランキング</span></div>
       </div>
-      <div class="rh-img"><img id="popImg" alt="" hidden></div>
+      <div class="rh-img" id="rhImg">
+        <img id="popImg2" class="im2" alt="" hidden>
+        <img id="popImg" class="im1" alt="" hidden>
+      </div>
     </header>
 
     <div class="rows" id="rows"></div>

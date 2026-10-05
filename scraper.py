@@ -174,7 +174,7 @@ def render_html(url: str, budget_ms: int = 8000, timeout: int = 60, _allow_any_h
 # ページ上のランキング枠がすべて表示し終わったか (商品リンクと価格が入ったか)
 RANKING_READY_JS = r"""
 (() => {
-  if (document.readyState !== 'complete') return false;
+  if (location.href === 'about:blank' || document.readyState !== 'complete') return false;
   const uls = [...document.querySelectorAll('ul.model-card-list.--ranking')];
   if (!uls.length) return true;
   return uls.every((ul) => {
@@ -322,6 +322,9 @@ def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45
                 if r.get("result", {}).get("value") is True:
                     ready = True
                     break
+            loc = ws.call("Runtime.evaluate", expression="location.href", returnByValue=True).get("result", {}).get("value") or ""
+            if loc.startswith("chrome-error:") or loc == "about:blank":
+                raise FetchError("ブラウザでページを開けませんでした（ネットワークに接続できません）")
             out = ws.call("Runtime.evaluate", expression="document.documentElement.outerHTML",
                           returnByValue=True).get("result", {}).get("value") or ""
         finally:
@@ -757,8 +760,20 @@ def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> l
     items = []
     for i, li in enumerate(lis):
         end = lis[i + 1].start() if i + 1 < len(lis) else len(body)
+        raw = body[li.start():end]
+        # 色違い (例: ホワイト) は <object class="model-img|model-btn" data-ranking="5〜8"> に入っている
+        var_img = var_url = var_color = ""
+        for tag, inner in re.findall(r'(?is)(<object\b[^>]*>)(.*?)</object>', raw):
+            if not re.search(r'\bdata-ranking=|\bmodel-(?:img|btn)\b', tag):
+                continue
+            if re.search(r'\bmodel-img\b', tag):
+                var_img = var_img or (_first(r'<img\b[^>]*\bsrc="(http[^"]+)"', inner) or "")
+            if re.search(r'\bmodel-btn\b', tag):
+                var_color = var_color or _text(inner)
+                var_url = var_url or (_first(r'<a\b[^>]*\bhref="([^"]*MC\d+[^"]*)"', inner) or "")
         chunk = re.sub(r'(?is)<object\b(?=[^>]*(?:\bdata-ranking=|\bclass="[^"]*\bmodel-(?:img|btn)\b))[^>]*>.*?</object>',
-                       "", body[li.start():end])
+                       "", raw)
+        main_color = _text(_first(r'(?is)<div\b[^>]*class="[^"]*\bmodel-btn\b[^"]*"[^>]*>(.*?)</div>', chunk) or "")
         rank = _first(r'data-ranking="(\d+)"', chunk)
         href = _first(r'<a\b[^>]*\bhref="([^"]*MC\d+[^"]*)"', chunk) or ""
         href = html.unescape(href)
@@ -773,6 +788,9 @@ def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> l
             "url": urljoin(base_url, href),
             "name": _by_key(chunk, "primename"),
             "image": html.unescape(img) if img else "",
+            "image2": html.unescape(var_img),          # 色違い (白など) の画像
+            "url2": urljoin(base_url, html.unescape(var_url)) if var_url else "",
+            "colors": [c for c in (main_color, var_color) if c],
             "price": _to_int(_by_key(chunk, "amttaxnounit")),
             "stock": _by_key(chunk, "stkname"),
             "os": _by_key(chunk, "os"),
