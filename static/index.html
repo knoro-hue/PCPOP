@@ -43,6 +43,15 @@
     <label><input type="checkbox" id="optModel" checked> 型番（モデル名）</label>
     <label class="lbl" style="margin-top:8px">キャラクター画像（任意・透過PNG推奨）</label>
     <input type="file" id="mascotFile" accept="image/*">
+    <label class="lbl" style="margin-top:8px" for="printMargin">印刷の余白（端が切れる場合は大きく）</label>
+    <select id="printMargin">
+      <option value="0">なし（フチなし印刷できるプリンター用）</option>
+      <option value="3">3mm</option>
+      <option value="5" selected>5mm（推奨）</option>
+      <option value="8">8mm</option>
+      <option value="10">10mm</option>
+    </select>
+    <p class="hint">印刷ダイアログでは「倍率：100％（既定）」「余白：既定」「背景のグラフィック：ON」にしてください。</p>
     <p class="hint">POP上の文字はクリックで直接編集できます。</p>
   </section>
 

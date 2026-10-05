@@ -241,38 +241,6 @@ def _fetch_powershell(url: str, timeout: int) -> str:
     return _powershell_bytes(url, timeout).decode("utf-8", errors="replace")
 
 
-_IMG_CACHE: dict[str, bytes] = {}
-
-
-def fetch_image(url: str) -> bytes:
-    """商品画像を取得 (ブラウザ側で白背景を透過処理するための中継用)。"""
-    global _DIRECT_OK
-    _check_host(url)
-    if url in _IMG_CACHE:
-        return _IMG_CACHE[url]
-    errors = []
-    data = None
-    if _DIRECT_OK is not False:
-        try:
-            data, _ = _urllib_bytes(url, 8)
-            _DIRECT_OK = True
-        except Exception as e:  # noqa: BLE001
-            errors.append(f"直接接続: {e}")
-            if _DIRECT_OK is None:
-                _DIRECT_OK = False
-    if data is None and os.name == "nt":
-        try:
-            data = _powershell_bytes(url, 30)
-        except Exception as e:  # noqa: BLE001
-            errors.append(f"Windowsプロキシ経由: {e}")
-    if data is None:
-        raise FetchError("画像を取得できませんでした（" + " / ".join(errors) + "）")
-    if len(_IMG_CACHE) > 200:
-        _IMG_CACHE.clear()
-    _IMG_CACHE[url] = data
-    return data
-
-
 # ---------------------------------------------------------------- helpers
 
 def _text(fragment: str, unescape: bool = True) -> str:

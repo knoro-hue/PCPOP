@@ -133,12 +133,13 @@ table.raw td { white-space: pre-wrap; }
   display: flex; justify-content: space-between;
 }
 
-@page { size: A4 portrait; margin: 0; }
+/* プリンターは用紙の端まで印刷できない (数mm切れる) ので、余白をとって全体を縮小して収める */
+@page { size: A4 portrait; margin: 5mm; }
 @media print {
   body { background: #fff; display: block; }
   .panel { display: none; }
   .stage { padding: 0; display: block; }
-  .pop { box-shadow: none; }
+  .pop { box-shadow: none; zoom: .95; margin: 0 auto; }
   [contenteditable]:hover, [contenteditable]:focus { outline: none; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

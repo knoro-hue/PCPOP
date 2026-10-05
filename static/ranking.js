@@ -73,7 +73,7 @@ const THEMES = {
 const DEFAULT_THEME = ["game", "stream", "creative"];
 
 /* ------------------------------------------------------------ state */
-const slots = [0, 1, 2].map((i) => ({ i, url: "", rank: null, cand: null, theme: DEFAULT_THEME[i], data: null, caseImg: "", sceneImg: "", descMode: "catch", sceneFit: "contain", cutout: true }));
+const slots = [0, 1, 2].map((i) => ({ i, url: "", rank: null, cand: null, theme: DEFAULT_THEME[i], data: null, caseImg: "", descMode: "catch" }));
 
 function specValue(d, label, detailed) {
   const s = d.keySpecs.find((x) => x.label === label);
@@ -82,12 +82,6 @@ function specValue(d, label, detailed) {
   let v = s.short || s.display;
   if (label === "メモリ") v = v.replace("メモリ", " ").replace(/\s+/g, " ").trim();
   return v;
-}
-
-// メイン画像以外で「使用シーン」に向く画像を推測
-function pickScene(images) {
-  const bad = /(case_|award|production-area|service-support|set-device|front_back|_side|overview|lowangle|feature\d|_main)/;
-  return images.find((u, i) => i > 0 && !bad.test(u)) || images[1] || images[0] || "";
 }
 
 /* ------------------------------------------------------------ panel */
@@ -102,16 +96,6 @@ function buildSlotPanel(s) {
   descSel.append(el("option", { value: "catch", text: "説明: 商品キャッチコピー" }), el("option", { value: "theme", text: "説明: テーマ文" }));
   descSel.onchange = () => { s.descMode = descSel.value; renderCard(s); };
 
-  const fitSel = el("select");
-  fitSel.append(
-    el("option", { value: "contain", text: "右画像: 全体表示（切れない）" }),
-    el("option", { value: "width", text: "右画像: 横幅に合わせる" }),
-    el("option", { value: "height", text: "右画像: 縦幅に合わせる" }));
-  fitSel.onchange = () => { s.sceneFit = fitSel.value; renderCard(s); };
-
-  const cut = el("input", { type: "checkbox" });
-  cut.checked = s.cutout;
-  cut.onchange = () => { s.cutout = cut.checked; renderCard(s); };
 
   const url = el("input", { type: "url", placeholder: `枠${s.i + 1} の商品URL` });
   const btn = el("button", { text: "取得" });
@@ -126,7 +110,6 @@ function buildSlotPanel(s) {
       const d = await call(path, body);
       s.data = d;
       s.caseImg = d.images[0] || "";
-      s.sceneImg = pickScene(d.images);
       renderCard(s); renderThumbs(s, box);
       const w = d.warnings.length ? "  ⚠ " + d.warnings.join(" / ") : "";
       status.className = "status " + (w ? "err" : "ok");
@@ -139,7 +122,6 @@ function buildSlotPanel(s) {
       if (s.cand && body.url) {
         s.data = fromCandidate(s.cand);
         s.caseImg = s.data.images[0] || "";
-        s.sceneImg = "";
         renderCard(s); renderThumbs(s, box);
         status.textContent += "\n→ ランキング一覧の情報で仮表示中（メモリ・ストレージは未取得。商品ページのソースを貼ると補完されます）";
       }
@@ -155,8 +137,7 @@ function buildSlotPanel(s) {
     el("div", { class: "row" }, url, btn),
     status,
     el("details", {}, el("summary", { text: "取得できない場合: ソース貼り付け" }), paste, pbtn),
-    el("div", { class: "row", style: "margin-top:6px;flex-wrap:wrap" }, descSel, fitSel),
-    el("label", {}, cut, " PC画像の白背景を透過する"),
+    el("div", { class: "row", style: "margin-top:6px" }, descSel),
     el("div", { class: "imgs" }),
   );
   return box;
@@ -179,64 +160,7 @@ function renderThumbs(s, box) {
     wrap.append(el("div", { class: "pick", text: label }), t, up);
     draw();
   };
-  group("左：PC本体画像", "caseImg");
-  group("右：イメージ画像（ゲーム画面などをアップロードも可）", "sceneImg");
-}
-
-/* ------------------------------------------------------------ PC画像の白背景透過 */
-const cutoutCache = new Map();
-
-// 画像の外周から繋がっている白っぽい領域を透明にする (元から透過PNGならそのまま)
-async function cutoutWhite(src) {
-  if (cutoutCache.has(src)) return cutoutCache.get(src);
-  const p = (async () => {
-    const proxied = /^https?:/.test(src) ? "/api/img?url=" + encodeURIComponent(src) : src;
-    const img = new Image();
-    img.src = proxied;
-    await img.decode();
-    const scale = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
-    const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
-    const cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
-    const ctx = cv.getContext("2d");
-    ctx.drawImage(img, 0, 0, w, h);
-    const id = ctx.getImageData(0, 0, w, h), d = id.data;
-    const at = (x, y) => (y * w + x) * 4;
-    const corners = [at(0, 0), at(w - 1, 0), at(0, h - 1), at(w - 1, h - 1)];
-    if (corners.some((i) => d[i + 3] < 30)) return proxied; // 既に透過
-    const whiteish = (i) => d[i + 3] > 0 && Math.min(d[i], d[i + 1], d[i + 2]) > 226 && Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) < 22;
-    if (!corners.every(whiteish)) return proxied; // 白背景ではない
-    const seen = new Uint8Array(w * h), stack = [];
-    for (let x = 0; x < w; x++) stack.push(x, 0, x, h - 1);
-    for (let y = 0; y < h; y++) stack.push(0, y, w - 1, y);
-    while (stack.length) {
-      const y = stack.pop(), x = stack.pop();
-      if (x < 0 || y < 0 || x >= w || y >= h) continue;
-      const k = y * w + x;
-      if (seen[k]) continue;
-      seen[k] = 1;
-      const i = k * 4;
-      if (!whiteish(i)) continue;
-      // 白に近いほど透明、境界付近は半透明にして縁をなめらかに
-      const m = Math.min(d[i], d[i + 1], d[i + 2]);
-      d[i + 3] = m >= 245 ? 0 : Math.round(d[i + 3] * (245 - m) / 19);
-      stack.push(x + 1, y, x - 1, y, x, y + 1, x, y - 1);
-    }
-    ctx.putImageData(id, 0, 0);
-    return cv.toDataURL("image/png");
-  })().catch(() => src);
-  cutoutCache.set(src, p);
-  return p;
-}
-
-function caseImgEl(s) {
-  if (!s.caseImg) return null;
-  const img = el("img", { src: s.caseImg, alt: "" });
-  if (s.cutout) {
-    img.style.visibility = "hidden";
-    cutoutWhite(s.caseImg).then((u) => { img.src = u; img.style.visibility = ""; });
-  }
-  return img;
+  group("PC本体画像（アップロードも可）", "caseImg");
 }
 
 /* ------------------------------------------------------------ POP card */
@@ -268,21 +192,26 @@ function renderCard(s) {
     ed("div", "card-model", d.model),
     ed("div", "card-desc", desc),
     rows);
+  const inst = d.installment && d.installment.monthly
+    ? el("div", { class: "inst" }, "月々 ", ed("b", "", yen(d.installment.monthly)), `円（${d.installment.count || 36}回払い）`)
+    : null;
   const price = el("div", { class: "card-price" },
-    el("span", { class: "y", text: "¥" }), ed("span", "n", yen(d.price)), el("span", { class: "t", text: "税込" }));
+    el("div", { class: "lbl", text: "販売価格" }),
+    el("div", { class: "amt" },
+      el("span", { class: "y", text: "¥" }), ed("span", "n", yen(d.price)), el("span", { class: "t", text: "税込" })),
+    inst);
 
   const side = el("div", { class: "card-side" },
-    el("div", { class: "rank-badge" },
-      el("span", { class: "crown", text: "♛" }), el("span", { class: "a", text: "人気" }), ed("span", "b", `No.${s.rank ?? s.i + 1}`)),
-    el("div", { class: `card-scene fit-${s.sceneFit}` },
-      s.sceneImg ? el("div", { class: "bg", style: `background-image:url("${s.sceneImg}")` }) : null,
-      s.sceneImg ? el("img", { src: s.sceneImg, alt: "" }) : null),
     el("div", { class: "card-chips" },
       ed("span", "h", th.chipsTitle),
-      el("div", { class: "chips" }, ...th.chips.map(([ic, t]) => el("div", { class: "chip" }, svg(ic), ed("div", "", t))))));
+      el("div", { class: "chips" }, ...th.chips.map(([ic, t]) => el("div", { class: "chip" }, svg(ic), ed("div", "", t))))),
+    el("div", { class: "price-row" },
+      price,
+      el("div", { class: "rank-badge" },
+        el("span", { class: "crown", text: "♛" }), el("span", { class: "a", text: "人気" }), ed("span", "b", `No.${s.rank ?? s.i + 1}`))));
 
   card.append(tab, el("div", { class: "card-body" },
-    el("div", { class: "card-case" }, el("div", { class: "stage-floor" }), el("div", { class: "case-img" }, caseImgEl(s)), price),
+    el("div", { class: "card-case" }, s.caseImg ? el("img", { src: s.caseImg, alt: "" }) : null),
     info, side));
 }
 
@@ -314,6 +243,18 @@ $("#mascotFile").onchange = (e) => {
 $(".rh-badge").style.right = "9mm";
 $("#btnPrint").onclick = () => window.print();
 
+// 印刷余白: @page の余白を設定し、POP全体をその内側に収まるよう縮小
+const printStyle = el("style");
+document.head.append(printStyle);
+function applyPrintMargin() {
+  const m = Number($("#printMargin").value);
+  const k = Math.min((210 - 2 * m) / 210, (297 - 2 * m) / 297) * 0.995;
+  printStyle.textContent = `@page { size: A4 portrait; margin: ${m}mm; }\n` +
+    `@media print { .rpop { zoom: ${k.toFixed(4)}; margin: 0 auto; } }`;
+}
+$("#printMargin").onchange = applyPrintMargin;
+applyPrintMargin();
+
 function bigImage(u) {
   return (u || "").replace(/([?&])sw=\d+/, "$1sw=1200");
 }
@@ -327,7 +268,7 @@ function fromCandidate(c) {
   if (c.video) ks.push({ label: "GPU", value: c.video, display: c.video, short: c.video });
   return {
     productId: c.url.match(/(MC\d+(?:-SN\d+)?)/)?.[1] || "", model: m ? m[1] : c.name, edition: m ? m[2] : "",
-    catchcopy: "", price: c.price, keySpecs: ks, images: c.image ? [bigImage(c.image)] : [], warnings: ["仮データ"],
+    catchcopy: "", price: c.price, installment: c.installment, keySpecs: ks, images: c.image ? [bigImage(c.image)] : [], warnings: ["仮データ"],
   };
 }
 
