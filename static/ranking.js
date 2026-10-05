@@ -308,9 +308,9 @@ function fitRow(row) {
   // 価格は枠の幅に収まるサイズに
   const amt = row.querySelector(".amt"), n = row.querySelector(".amt .n");
   if (amt && n) {
-    let mm = 11.5;
+    let mm = 16;
     n.style.fontSize = mm + "mm";
-    while (mm > 7 && amt.scrollWidth > amt.clientWidth + 1) { mm -= 0.25; n.style.fontSize = mm + "mm"; }
+    while (mm > 8 && amt.scrollWidth > amt.clientWidth + 1) { mm -= 0.25; n.style.fontSize = mm + "mm"; }
   }
   let k = 1;
   row.style.setProperty("--k", k);

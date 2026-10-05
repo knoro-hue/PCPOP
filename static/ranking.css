@@ -131,7 +131,7 @@
 .rrow {
   --m1: #ffe9a6; --m2: #e9b10f; --m3: #8a6200; --tint: #fffaf0;  /* 金 */
   flex: 1; min-height: 0; padding: 2.5mm 4mm 3mm 3mm;
-  display: grid; grid-template-columns: 25mm minmax(0, 1fr) 54mm; grid-template-rows: auto minmax(0, 1fr);
+  display: grid; grid-template-columns: 24mm minmax(0, 1fr) 70mm; grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas: "medal head head" "medal specs price"; column-gap: 3.5mm; row-gap: 1.8mm; align-items: center;
   position: relative; border-radius: 2.5mm;
   background: linear-gradient(100deg, var(--tint) 0%, #fff 30%, #fff 75%, #f3f6fb 100%);
@@ -174,7 +174,7 @@
   margin: 0; border: 0; overflow: visible; }  /* 個別POP (style.css) の .specs を打ち消す */
 .spec { display: flex; align-items: stretch; min-height: calc(6mm * var(--k)); }
 .spec .k {
-  width: 30mm; flex-shrink: 0; background: linear-gradient(90deg, #0b1638, #1b3a8f); color: #fff; font-size: 2.9mm; font-weight: bold; white-space: nowrap; min-height: 6mm;
+  width: 29.5mm; flex-shrink: 0; background: linear-gradient(90deg, #0b1638, #1b3a8f); color: #fff; font-size: 2.75mm; font-weight: bold; white-space: nowrap; min-height: 6mm;
   display: flex; align-items: center; gap: 1.5mm; padding-left: 2mm; border-radius: 1mm 0 0 1mm;
   clip-path: polygon(0 0, 100% 0, calc(100% - 2mm) 100%, 0 100%);
 }
@@ -188,23 +188,23 @@
 .pricebox {
   grid-area: price; align-self: stretch; min-height: 24mm; display: flex; flex-direction: column; justify-content: center;
   background: linear-gradient(180deg, #fff 60%, #fff3f4); border: .7mm solid var(--red); border-radius: 2.5mm; box-shadow: 0 .9mm 0 #b81d2c;
-  padding: 2mm 3mm; position: relative; line-height: 1; margin: 1.5mm 0 .5mm;
+  padding: 2mm 3.5mm; position: relative; line-height: 1; margin: 1.5mm 0 .5mm;
 }
 .pricebox .stock {
-  position: absolute; top: -2.6mm; right: 3mm; background: var(--navy); color: #fff; font-size: 2.8mm; font-weight: 900;
+  position: absolute; top: -2.8mm; right: 3mm; background: var(--navy); color: #fff; font-size: 3.4mm; font-weight: 900;
   padding: .8mm 2.4mm; border-radius: 1mm;
 }
 .pricebox .lbl {
-  position: absolute; top: -.7mm; left: -.7mm; background: var(--red); color: #fff; font-size: 2.8mm; font-weight: 900;
+  position: absolute; top: -.7mm; left: -.7mm; background: var(--red); color: #fff; font-size: 3.4mm; font-weight: 900;
   padding: .8mm 2.4mm; border-radius: 2.5mm 0 2.5mm 0;
 }
 .pricebox .amt { text-align: right; color: var(--red); white-space: nowrap; overflow: hidden; margin-top: 3mm; font-family: var(--en); font-style: italic; font-weight: 800; }
-.pricebox .y { font-size: 5.5mm; margin-right: .5mm; }
-.pricebox .n { font-size: 11.5mm; letter-spacing: -.02em; }
+.pricebox .y { font-size: 7.5mm; margin-right: .6mm; }
+.pricebox .n { font-size: 16mm; letter-spacing: -.02em; }
 .pricebox .t { font-style: normal; font-family: var(--jp); }
-.pricebox .t { font-size: 3mm; color: #333; margin-left: .8mm; }
-.pricebox .inst { text-align: right; font-size: 3mm; color: #333; font-weight: bold; margin-top: 1.6mm; }
-.pricebox .inst b { font-family: var(--en); font-size: 4.4mm; color: var(--navy); }
+.pricebox .t { font-size: 3.6mm; color: #333; margin-left: 1mm; }
+.pricebox .inst { text-align: right; font-size: 3.6mm; color: #333; font-weight: bold; margin-top: 2mm; }
+.pricebox .inst b { font-family: var(--en); font-size: 6mm; color: var(--navy); }
 
 /* footer */
 .rf {
