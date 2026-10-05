@@ -116,6 +116,21 @@ $("#topImgFile").onchange = (e) => {
 };
 
 /* ------------------------------------------------------------ POP: rank rows */
+// 王冠アイコン（色は段の --m1/--m2/--m3 = 金・銀・銅）
+function crownSvg(idx) {
+  const g = `cg${idx}`;
+  return `<svg class="crown-svg" viewBox="0 0 100 84" aria-hidden="true">
+  <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" style="stop-color:var(--m1)"/><stop offset=".55" style="stop-color:var(--m2)"/><stop offset="1" style="stop-color:var(--m3)"/>
+  </linearGradient></defs>
+  <path d="M10 78 L5 28 L29 48 L50 12 L71 48 L95 28 L90 78 Z" fill="url(#${g})" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="10" y="66" width="80" height="12" fill="var(--m3)" opacity=".35"/>
+  <circle cx="5" cy="25" r="5.5" fill="url(#${g})" stroke="#fff" stroke-width="2.5"/>
+  <circle cx="50" cy="9" r="6" fill="url(#${g})" stroke="#fff" stroke-width="2.5"/>
+  <circle cx="95" cy="25" r="5.5" fill="url(#${g})" stroke="#fff" stroke-width="2.5"/>
+</svg>`;
+}
+
 function renderRow(s) {
   const row = $(`#row${s.i}`);
   row.replaceChildren();
@@ -133,8 +148,9 @@ function renderRow(s) {
   const inst = d?.installment?.monthly ? d.installment : c.installment;
   const stock = d?.stock || c.stock;
 
-  const medal = el("div", { class: "medal" },
-    el("span", { class: "crown", text: "♛" }), ed("span", "no", `${rank}`), el("span", { class: "i", text: "位" }));
+  const medal = el("div", { class: "medal" });
+  medal.innerHTML = crownSvg(s.i);
+  medal.append(el("div", { class: "num" }, ed("span", "no", `${rank}`), el("span", { class: "i", text: "位" })));
 
   const specs = el("div", { class: "specs" },
     ...rowSpecs(s, $("#optDetail").checked).map(([k, ic, v]) =>

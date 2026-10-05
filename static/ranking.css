@@ -89,17 +89,16 @@
 .rrow.empty { align-items: center; justify-content: center; color: #9aa6b8; font-size: 4mm; border-left-color: #ccd3de; }
 
 .medal {
-  width: 24mm; height: 24mm; flex-shrink: 0; border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, var(--m1) 0%, var(--m2) 55%, var(--m3) 100%);
-  border: .8mm solid #fff; box-shadow: 0 .8mm 1.6mm rgba(0,0,0,.35), inset 0 -1.2mm 2mm rgba(0,0,0,.2), inset 0 1.2mm 2mm rgba(255,255,255,.55);
-  display: flex; align-items: baseline; justify-content: center; position: relative; padding-top: 4mm;
-  color: #fff; font-weight: 900; line-height: 1; text-shadow: 0 .4mm .8mm rgba(0,0,0,.45);
+  width: 28mm; height: 24mm; flex-shrink: 0; position: relative;
+  filter: drop-shadow(0 .7mm .9mm rgba(0,0,0,.35));
 }
-.rrow.rank-1 .medal, .rrow.rank-2 .medal { color: #3d2a00; text-shadow: 0 .3mm 0 rgba(255,255,255,.7); }
-.rrow.rank-2 .medal { color: #2f3640; }
-.medal .crown { position: absolute; top: 2.2mm; left: 0; right: 0; text-align: center; font-size: 4.2mm; color: #fff; text-shadow: 0 0 1mm rgba(0,0,0,.4); }
-.medal .no { font-size: 12mm; letter-spacing: -.04em; }
-.medal .i { font-size: 4.5mm; margin-left: .3mm; }
+.medal .crown-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.medal .num {
+  position: absolute; left: 0; right: 0; bottom: 2.6mm; display: flex; align-items: baseline; justify-content: center;
+  font-weight: 900; line-height: 1; color: #fff; -webkit-text-stroke: .9mm var(--m3); paint-order: stroke fill;
+}
+.medal .no { font-size: 10mm; letter-spacing: -.04em; }
+.medal .i { font-size: 4mm; margin-left: .3mm; }
 
 .info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1mm; }
 .info .name { font-size: 5mm; font-weight: 900; color: #111; line-height: 1.25; }
