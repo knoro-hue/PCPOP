@@ -211,5 +211,40 @@ class TestTC30Rendered(unittest.TestCase):
             scraper.parse_ranking_sections(self.raw, "https://www.dospara.co.jp/TC30")
 
 
+class TestTC143Rendered(unittest.TestCase):
+    """/TC143 (ゲーミングノート): li.get_ranking_data のカード。名前の欄はコメントアウト、画面サイズあり。"""
+
+    def setUp(self):
+        d = Path(__file__).parent / "fixtures"
+        self.rendered = (d / "tc143_rendered.html").read_text(encoding="utf-8")
+        self.raw = (d / "tc143_raw.html").read_text(encoding="utf-8")
+
+    def test_note_ranking(self):
+        secs = scraper.parse_ranking_sections(self.rendered, "https://www.dospara.co.jp/TC143")
+        self.assertEqual([s["series"] for s in secs], ["Nシリーズ（ゲーミングノート）"])
+        items = secs[0]["items"]
+        self.assertEqual([i["rank"] for i in items], [1, 2, 3, 4])
+        self.assertEqual([i["price"] for i in items], [199980, 259980, 429980, 149980])
+        a = items[0]
+        self.assertEqual(a["url"], "https://www.dospara.co.jp/TC143/MC24001.html")
+        self.assertTrue(a["name"].startswith("GALLERIA XL7C-R56-6"))
+        self.assertEqual(a["cpu"], "インテル Core i7-13620H")
+        self.assertEqual(a["video"], "GeForce RTX 5060 Laptop GPU 8GB")
+        self.assertEqual(a["os"], "Windows 11 Home")
+        self.assertEqual(a["display"], "15.6インチ")
+        self.assertEqual(a["stock"], "翌日出荷")
+        self.assertEqual(a["installment"], {"monthly": 5500, "count": 36})
+
+    def test_name_falls_back_to_image_alt(self):
+        src = self.rendered.replace('data-key="primename"', 'data-key="x"').replace(
+            'alt="" data-key="primeimgurl"', 'alt="GALLERIA ALT NAME" data-key="primeimgurl"', 1)
+        items = scraper.parse_ranking_sections(src)[0]["items"]
+        self.assertEqual(items[0]["name"], "GALLERIA ALT NAME")
+
+    def test_raw_source_is_reported_as_not_rendered(self):
+        with self.assertRaises(scraper.RankingNotRendered):
+            scraper.parse_ranking_sections(self.raw, "https://www.dospara.co.jp/TC143")
+
+
 if __name__ == "__main__":
     unittest.main()

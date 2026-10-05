@@ -213,21 +213,37 @@ def render_html(url: str, budget_ms: int = 8000, timeout: int = 60, _allow_any_h
 RANKING_READY_JS = r"""
 (() => {
   if (location.href === 'about:blank' || document.readyState !== 'complete') return false;
-  const uls = [...document.querySelectorAll('ul.model-card-list.--ranking')];
-  if (!uls.length) return true;
-  return uls.every((ul) => {
-    const a = ul.querySelector('a[href*="/MC"]');
-    const p = ul.querySelector('[data-key="amttaxnounit"]');
+  // /TC30 など: ul.model-card-list.--ranking / /TC143 (ノート) など: li.get_ranking_data[data-ranking]
+  const boxes = [...document.querySelectorAll('ul.model-card-list.--ranking, li.get_ranking_data[data-ranking]')];
+  if (!boxes.length) return true;
+  return boxes.every((el) => {
+    const a = el.querySelector('a[href*="/MC"]');
+    const p = el.querySelector('[data-key="amttaxnounit"]');
     return a && (!p || p.textContent.trim() !== '');
   });
 })()
+"""
+
+# /TC143 はカード内のモデル名の欄がコメントアウトされている。
+# ページの JS が名前を書き込めるよう、表示前に見えない欄 (data-key="primename") を足しておく
+RANKING_PREPARE_JS = r"""
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('li.get_ranking_data[data-ranking]').forEach((li) => {
+    if (li.querySelector('[data-key="primename"]')) return;
+    const s = document.createElement('span');
+    s.setAttribute('data-key', 'primename');
+    s.hidden = true;
+    (li.querySelector('a') || li).appendChild(s);
+  });
+});
 """
 
 
 # 月々の分割価格はランキング表示のさらに後 (約1秒後) に入る: 入るまで少しだけ待つ
 INSTALLMENT_READY_JS = r"""
 (() => {
-  const boxes = [...document.querySelectorAll('ul.model-card-list.--ranking .js-smbc-box')];
+  const boxes = [...document.querySelectorAll(
+    'ul.model-card-list.--ranking .js-smbc-box, li.get_ranking_data[data-ranking] .js-smbc-box-note')];
   return !boxes.length || boxes.every((b) => {
     const p = b.querySelector('.smbc_item_price');
     const price = Number((p ? p.textContent : '').replace(/[^0-9]/g, ''));
@@ -404,6 +420,9 @@ def render_until(url: str, ready_js: str = RANKING_READY_JS, timeout: float = 45
     if hit is not None:
         return hit
     with _browser_page(timeout) as (ws, deadline):
+        if ready_js is RANKING_READY_JS:
+            ws.call("Page.enable")
+            ws.call("Page.addScriptToEvaluateOnNewDocument", source=RANKING_PREPARE_JS)
         ws.call("Page.navigate", url=url)
         ready = _wait(ws, deadline, ready_js)
         if ready and ready_js is RANKING_READY_JS:
@@ -439,7 +458,7 @@ GALLERIA_EXTRACT_JS = r"""
   };
   const out = {};
   const all = [...document.querySelectorAll('body *')];
-  for (const L of ['S', 'X', 'F', 'E']) {
+  for (const L of ['S', 'X', 'F', 'E', 'N']) {
     const re = new RegExp('^\\s*' + L + '\\s*Series\\s*$', 'i');
     let h = all.find((e) => e.offsetWidth && re.test(e.innerText || '') && ![...e.children].some((c) => re.test(c.innerText || '')));
     if (!h) h = [...document.images].find((i) => re.test(i.alt || ''));
@@ -876,14 +895,17 @@ class RankingNotRendered(ParseError):
     """ランキング枠はあるが、中身が JavaScript で後から描画されるため空のケース。"""
 
 
-_RANK_UL = re.compile(r'<ul\b[^>]*class="[^"]*\bmodel-card-list\b[^"]*--ranking[^"]*"[^>]*>', re.I)
+# ランキング枠: /TC30 等は ul.model-card-list.--ranking、/TC143 (ノート) 等は div.pc-reccomend__card-list
+_RANK_UL = re.compile(
+    r'<(?:ul\b[^>]*class="[^"]*\bmodel-card-list\b[^"]*--ranking[^"]*"'
+    r'|div\b[^>]*class="pc-reccomend__card-list")[^>]*>', re.I)
 _RANK_LI = re.compile(r'<li\b[^>]*\bdata-ranking="(\d+)"[^>]*>', re.I)
 _MC_URL = re.compile(r"/(MC\d+)(?:-SN\d+)?\.html", re.I)
 
 
 def _by_key(chunk: str, key: str) -> str:
     """data-key="xxx" を持つ要素のテキスト (ドスパラ一覧の共通マークアップ)。"""
-    v = _first(rf'<(?:p|span|div)[^>]*data-key="{key}"[^>]*>(.*?)</(?:p|span|div)>', chunk)
+    v = _first(rf'<(?:p|span|div|small)\b[^>]*data-key="{key}"[^>]*>(.*?)</(?:p|span|div|small)>', chunk)
     return _text(v) if v else ""
 
 
@@ -929,12 +951,14 @@ def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> l
             continue  # 未表示のテンプレート (href 空など)
         img = _first(r'<img\b[^>]*\bsrc="([^"]+)"[^>]*data-key="primeimgurl"', chunk) or _first(
             r'<img\b[^>]*data-key="primeimgurl"[^>]*\bsrc="([^"]+)"', chunk) or _first(r'<img\b[^>]*\bsrc="(http[^"]+)"', chunk)
+        alt = _first(r'<img\b[^>]*\balt="([^"]*)"[^>]*data-key="primeimgurl"', chunk) or _first(
+            r'<img\b[^>]*data-key="primeimgurl"[^>]*\balt="([^"]*)"', chunk) or ""
         monthly = _first(r'data-format="\{installmentAmt\}"[^>]*>([\d,]+)<', chunk)
         count = _first(r'data-format="\{installment\}回"[^>]*>(\d+)回<', chunk)
         items.append({
             "rank": int(rank),
             "url": urljoin(base_url, href),
-            "name": _by_key(chunk, "primename"),
+            "name": _by_key(chunk, "primename") or html.unescape(alt).strip(),
             "image": html.unescape(img) if img else "",
             "image2": html.unescape(var_img),          # 色違い (白など) の画像
             "url2": urljoin(base_url, html.unescape(var_url)) if var_url else "",
@@ -944,6 +968,8 @@ def parse_ranking(src: str, base_url: str = BASE, limit: int | None = None) -> l
             "os": _by_key(chunk, "os"),
             "cpu": _by_key(chunk, "cpu"),
             "video": _by_key(chunk, "video"),
+            "display": _by_key(chunk, "display"),     # ノート: 画面サイズ (例: 15.6インチ)
+            "catchcopy": _by_key(chunk, "catchcopy"),
             "tags": [_text(t) for t in re.findall(r'<p class="tag-appeal">(.*?)</p>', chunk, re.S) if _text(t)],
             "installment": {"monthly": _to_int(monthly), "count": _to_int(count)} if monthly else None,
         })
@@ -983,9 +1009,20 @@ _PRODUCT_IMG = re.compile(r"(/img/large/|/dw/image/|Sites-dospara-catalog)", re.
 _SPEC_LABELS = {"OS": "os", "GPU": "video", "CPU": "cpu"}
 
 
-def _series_name(title: str) -> str:
-    t = re.sub(r"(ゲーミング)?(PC|パソコン)?\s*(おすすめ|人気|売れ筋)?\s*ランキング.*$", "", title).strip()
+def _series_name(title: str, page_series: str = "") -> str:
+    t = re.sub(r"(ゲーミング)?(PC|パソコン)?\s*(おすすめ|売れ筋)?\s*(人気)?\s*ランキング.*$", "", title).strip()
+    if not t and page_series:  # 「売れ筋人気ランキング」だけの見出し (/TC143) はページのシリーズ名
+        return page_series
     return t or title
+
+
+def _page_series(src: str) -> str:
+    """ページ上部の画像 alt の「N Series for Gaming」などからシリーズ名 (例: Nシリーズ（ゲーミングノート）)。"""
+    m = re.search(r'alt="([A-Z])\s+Series\s+for\s+Gaming\b([^"]*)"', src)
+    if not m:
+        return ""
+    note = "（ゲーミングノート）" if re.search(r"ノート", m.group(2)) else ""
+    return f"{m.group(1)}シリーズ{note}"
 
 
 def _parse_series_cards(region: str, base_url: str) -> list[dict]:
@@ -1045,6 +1082,7 @@ def parse_ranking_sections(src: str, base_url: str = BASE) -> list[dict]:
     """
     src = re.sub(r"<!--.*?-->", "", src, flags=re.S)
     src = re.sub(r"(?is)<(script|style|noscript)\b.*?</\1>", "", src)
+    page_series = _page_series(src)
     heads = list(_HEADING.finditer(src))
     sections = []
     for i, h in enumerate(heads):
@@ -1061,7 +1099,7 @@ def parse_ranking_sections(src: str, base_url: str = BASE) -> list[dict]:
         else:
             items = _parse_series_cards(region, base_url)
         if items:
-            sections.append({"title": title, "series": _series_name(title), "items": items})
+            sections.append({"title": title, "series": _series_name(title, page_series), "items": items})
     if not sections:
         # 見出しが無い / 取れない場合: ランキング枠単体
         items = parse_ranking(src, base_url)  # 未描画なら RankingNotRendered

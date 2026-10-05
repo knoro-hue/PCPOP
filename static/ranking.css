@@ -84,6 +84,10 @@
   radial-gradient(ellipse 70% 55% at 50% 105%, rgba(255,170,140,.95), transparent 70%),
   radial-gradient(ellipse 60% 60% at 30% 60%, rgba(40,170,230,.8), transparent 70%),
   linear-gradient(180deg, #06123f 0%, #0d3c8c 50%, #2b8fc9 100%); }
+.rh[data-series="N"] .rh-bg:not(.official) { background:
+  radial-gradient(ellipse 55% 70% at 80% 30%, rgba(255,60,120,.8), transparent 70%),
+  radial-gradient(ellipse 50% 60% at 55% 100%, rgba(80,120,255,.75), transparent 70%),
+  linear-gradient(125deg, #08082a 0%, #2a1468 55%, #7a1a6e 100%); }
 /* 粒子感 + 文字側を少し暗く */
 .rh-grain {
   background:

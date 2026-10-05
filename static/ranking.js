@@ -30,6 +30,7 @@ const ICONS = {
   gpu: `<rect x="2" y="5" width="20" height="12" rx="1.5"/><circle cx="8.5" cy="11" r="3.4" fill="${NAVY}"/><circle cx="16.5" cy="11" r="2.4" fill="${NAVY}"/><path d="M4 17v3h7v-3" fill="none" stroke="currentColor" stroke-width="1.6"/>`,
   memory: `<rect x="2" y="6.5" width="20" height="9.5" rx="1"/><path d="M5 16v3M8 16v3M11 16v3M14 16v3M17 16v3M20 16v3" stroke="currentColor" stroke-width="1.5"/><rect x="4.5" y="9" width="3.5" height="4.5" fill="${NAVY}"/><rect x="10.3" y="9" width="3.5" height="4.5" fill="${NAVY}"/><rect x="16" y="9" width="3.5" height="4.5" fill="${NAVY}"/>`,
   storage: `<rect x="4" y="2.5" width="16" height="19" rx="2"/><rect x="7" y="15.5" width="10" height="3" rx="1" fill="${NAVY}"/>`,
+  display: `<rect x="3" y="4" width="18" height="12" rx="1.2"/><rect x="5" y="6" width="14" height="8" fill="${NAVY}"/><path d="M1 18.5h22l-1.5 2h-19z"/>`,
   os: `<rect x="3" y="3" width="8.5" height="8.5"/><rect x="12.5" y="3" width="8.5" height="8.5"/><rect x="3" y="12.5" width="8.5" height="8.5"/><rect x="12.5" y="12.5" width="8.5" height="8.5"/>`,
 };
 const svg = (name) => el("span", { html: `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>` }).firstChild;
@@ -50,6 +51,7 @@ function rowSpecs(c) {
     ["CPU", "cpu", c.cpu || "—"],
     ["グラフィックス", "gpu", c.video || "—"],
     ["OS", "os", c.os || "—"],
+    ...(c.display ? [["画面サイズ", "display", c.display]] : []),  // ノート (/TC143 など)
   ];
 }
 
@@ -81,7 +83,8 @@ function renderHeader() {
   tag.textContent = sub;
   tag.hidden = !sub;
   const first = section.items[0]?.name || "";
-  $("#popKicker").textContent = /^GALLERIA/i.test(first) ? "GALLERIA GAMING PC" : "GAMING PC";
+  const kind = section.items.some((c) => c.display) ? "GAMING NOTEBOOK" : "GAMING PC";
+  $("#popKicker").textContent = /^GALLERIA/i.test(first) ? `GALLERIA ${kind}` : kind;
   $("#rh").dataset.series = L || "other";
   renderBackground();
   renderTopImage();
