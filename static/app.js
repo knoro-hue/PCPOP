@@ -281,7 +281,7 @@ function fitText(node, maxMm, minMm) {
 }
 function fitSheet() {
   fitText($(".s-code"), 24, 9);
-  fitText($(".s-price .n"), 46, 20);
+  fitText($(".s-price .n"), 38.8, 20);  // 110pt (PowerPoint の原稿と同じ)
   // 基本構成の値も1行に収める
   document.querySelectorAll(".s-basic .m").forEach((m) => fitText(m, 6.2, 3.6));
 }

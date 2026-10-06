@@ -84,10 +84,10 @@
 .ports tr.hd th + th { border-left: .2mm solid #fff; }
 
 /* 価格 */
-.s-price { flex-shrink: 0; text-align: center; margin-top: 2mm; }
+.s-price { flex-shrink: 0; text-align: center; margin-top: 3mm; }
 .s-price .amt { display: flex; justify-content: center; align-items: flex-end; color: var(--red); line-height: .95; }
 .s-price .n {
-  font-family: var(--impact); font-weight: bold; font-size: 46mm; line-height: 1; letter-spacing: .06em; white-space: nowrap; max-width: 160mm; overflow: hidden;
+  font-family: var(--impact); font-weight: bold; font-size: 38.8mm; line-height: 1.08; letter-spacing: .06em; white-space: nowrap; max-width: 160mm; overflow: hidden;
   text-shadow: .5mm .5mm 0 rgba(0,0,0,.18);
 }
 .s-price .unit { display: flex; flex-direction: column; align-items: center; margin-left: 2mm; padding-bottom: 1.5mm; }
