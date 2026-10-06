@@ -249,9 +249,9 @@ class TestTC143Rendered(unittest.TestCase):
 
 
 class TestAddMemory(unittest.TestCase):
-    """デスクトップ (/TC30) だけ商品ページからメモリを付ける。ノート (/TC143) は読まない。"""
+    """デスクトップ (/TC30)・ノート (/TC143) とも商品ページからメモリを付ける。"""
 
-    def test_desktop_only(self):
+    def test_desktop_and_note(self):
         d = Path(__file__).parent / "fixtures"
         product = (d / "MC25585-SN5037.html").read_text(encoding="utf-8")
         desk = scraper.parse_ranking_sections((d / "tc30_rendered.html").read_text(encoding="utf-8"))
@@ -270,8 +270,8 @@ class TestAddMemory(unittest.TestCase):
             scraper.fetch_html = orig
         self.assertEqual(errors, [])
         self.assertEqual(desk[0]["items"][0]["memory"], "16GB (16GB×1) (DDR5-4800)")
-        self.assertNotIn("memory", note[0]["items"][0])
-        self.assertTrue(opened and all("/TC30/" in u for u in opened))
+        self.assertEqual(note[0]["items"][0]["memory"], "16GB (16GB×1) (DDR5-4800)")
+        self.assertTrue(any("/TC143/" in u for u in opened))
         self.assertEqual(len(opened), len(set(opened)))  # 同じ商品ページは1回だけ
 
     def test_failure_falls_back(self):

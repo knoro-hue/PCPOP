@@ -73,7 +73,7 @@ function rowSpecs(c) {
   return [
     ["CPU", "cpu", c.cpu || "—"],
     ["グラフィックス", "gpu", c.video || "—"],
-    // デスクトップ (/TC30) はメモリ (商品ページから取得)。取れなかった時とノートは OS
+    // メモリ (商品ページから取得)。取れなかった時は OS
     c.memory ? ["メモリ", "memory", c.memory] : ["OS", "os", c.os || "—"],
     ...(c.display ? [["画面サイズ", "display", c.display]] : []),  // ノート (/TC143 など)
   ];

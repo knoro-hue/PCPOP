@@ -549,13 +549,13 @@ def fetch_memory(url: str) -> str:
 
 
 def add_memory(sections: list[dict]) -> list[str]:
-    """デスクトップ (/TC30 など: 画面サイズの無いランキング) の各モデルにメモリを付ける。
+    """各モデルにメモリを付ける (デスクトップ /TC30・ノート /TC143 とも)。
 
     ランキングのページにはメモリが無いため、ここだけ各モデルの商品ページを読む (OS 欄の代わりに表示)。
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    items = [it for s in sections if not any(i.get("display") for i in s["items"]) for it in s["items"]]
+    items = [it for s in sections for it in s["items"]]
     urls = list(dict.fromkeys(it["url"] for it in items if it.get("url")))
     if not urls:
         return []
