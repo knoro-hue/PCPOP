@@ -904,7 +904,7 @@ def parse_product(src: str, url: str = "") -> dict:
 
     warranty = _first(r'<li class="spec-warranty">(.*?)<a', src)
 
-    return {
+    out = {
         "url": url,
         "canonical": _first(r'<link rel="canonical" href="([^"]+)"', src),
         "productId": pj.get("productID") or ld.get("sku"),
@@ -925,6 +925,150 @@ def parse_product(src: str, url: str = "") -> dict:
         "lineup": parse_lineup(src),
         "productJson": pj,
         "warnings": _warnings(pj, table, price),
+    }
+    out["sheet"] = pop_sheet(out, src)
+    return out
+
+
+# ---------------------------------------------------------------- 個別POP (店頭フォーマット) 用の整形
+
+_ZEN = str.maketrans("０１２３４５６７８９，．（）", "0123456789,.()")
+# 端子形状の表 (USB Type-A 系 / Type-C 系)
+PORT_ROWS_A = ["2.0", "3.0", "3.2 Gen1 Type-A", "3.2 Gen2 Type-A"]
+PORT_ROWS_C = ["3.2 Gen1 Type-C", "3.2 Gen2 Type-C", "3.2 Gen2x2 Type-C", "4.0", "Thunderbolt 4", "Thunderbolt 5"]
+
+
+def _paren_split(v: str) -> tuple[str, str]:
+    """'AMD Ryzen 7 7700 (3.8GHz-5.3GHz/8コア/16スレッド)' → (本体, '(…)')"""
+    v = v.split("\n")[0].translate(_ZEN).strip()
+    m = re.match(r"^(.*?)\s*(\(.*\))\s*$", v)
+    return (m.group(1).strip(), m.group(2)) if m else (v, "")
+
+
+def _port_name(raw: str) -> str:
+    n = re.sub(r"\s+", " ", raw.translate(_ZEN)).strip()
+    n = re.sub(r"^USB\s*", "", n, flags=re.I)
+    if re.match(r"(?i)thunderbolt\s*(\d)", n):
+        return "Thunderbolt " + re.match(r"(?i)thunderbolt\s*(\d)", n).group(1)
+    if re.match(r"^4(\.0)?\b", n):
+        return "4.0"
+    if re.match(r"^2\.0", n):
+        return "2.0"
+    if re.match(r"^3\.0", n):
+        return "3.0"
+    m = re.match(r"(?i)^3\.[12]\s*(Gen\s*2x2|Gen\s*2|Gen\s*1)?\s*(Type-?([AC]))?", n)
+    if m:
+        gen = re.sub(r"\s+", "", m.group(1) or "Gen1").replace("gen", "Gen")
+        return f"3.2 {gen} Type-{(m.group(3) or 'A').upper()}"
+    return n
+
+
+def parse_ports(value: str) -> dict:
+    """入出力ポート '前面:USB 2.0 ×2 、…\n背面:…' → {"cols": ["前面","背面"], "rows": {"2.0": [2, 4], …}}"""
+    cols, counts = [], {}
+    for line in (value or "").translate(_ZEN).split("\n"):
+        m = re.match(r"^\s*([^:：]{1,6})[:：](.*)$", line)
+        side, body = (m.group(1).strip(), m.group(2)) if m else ("", line)
+        items = [x for x in re.split(r"[、,]", body) if re.search(r"(?i)usb|thunderbolt", x)]
+        if not items:
+            continue
+        if side not in cols:
+            cols.append(side)
+        for it in items:
+            c = re.search(r"[×xX]\s*(\d+)\s*$", it.strip())
+            name = _port_name(re.sub(r"[×xX]\s*\d+\s*$", "", it.strip()))
+            counts.setdefault(name, {})
+            counts[name][side] = counts[name].get(side, 0) + (int(c.group(1)) if c else 1)
+    rows = {n: [counts.get(n, {}).get(c, 0) for c in cols] for n in PORT_ROWS_A + PORT_ROWS_C}
+    return {"cols": [c or "数" for c in cols], "rows": rows} if cols else {}
+
+
+def parse_game_fps(src: str) -> dict:
+    """商品ページにゲームのフレームレート表 (FHD / 4K など) があれば {"cols": [...], "rows": [{"title", "vals"}]}。"""
+    for t in re.findall(r"(?is)<table\b.*?</table>", src):
+        if not re.search(r"(?i)fps", t):
+            continue
+        rows = []
+        for tr in re.findall(r"(?is)<tr\b.*?</tr>", t):
+            cells = [_text(c) for c in re.findall(r"(?is)<t[hd]\b[^>]*>(.*?)</t[hd]>", tr)]
+            if cells:
+                rows.append(cells)
+        if len(rows) < 2 or not any(re.search(r"(?i)FHD|WQHD|4K|フルHD|1080|1440|2160", c) for c in rows[0]):
+            continue
+        cols = rows[0][1:]
+        body = [{"title": r[0], "vals": [re.sub(r"(?i)\s*fps$", "", v) + " fps" if re.search(r"\d", v) else v
+                                         for v in r[1:len(cols) + 1]]}
+                for r in rows[1:] if r and r[0]]
+        if body:
+            return {"cols": cols, "rows": body}
+    return {}
+
+
+def pop_sheet(d: dict, src: str = "") -> dict:
+    """店頭POP (基本構成・ゲーム性能・端子・仕様) 用に商品データを整形する。"""
+    t = {r["label"]: r["value"] for r in d.get("specTable", [])}
+    k = {s["label"]: s["value"] for s in d.get("keySpecs", [])}
+    get = lambda *names: next((v for n in names for v in (k.get(n), t.get(n)) if v), "")
+
+    model = d.get("model") or ""
+    m = re.match(r"^(GALLERIA|THIRDWAVE|raytrek|Diginnos)\s+([A-Za-z0-9][A-Za-z0-9-]*)", model, re.I)
+    brand = m.group(1).upper() if m else ""
+    code = m.group(2) if m else (model.split(" ")[0] if model else "")
+    series = f"{code[0].upper()}-Series" if brand == "GALLERIA" and code[:1].isalpha() else (m.group(1) if m else "")
+
+    gpu_main, gpu_sub = _paren_split(get("GPU", "グラフィック機能", "グラフィックボード"))
+    gpu_main = re.sub(r"\s*GDDR\d+X?\b", "", re.sub(r"^NVIDIA\s+", "", gpu_main)).strip()
+    gpu_sub = gpu_sub.replace(",", ", ").replace(",  ", ", ")
+    cpu_main, cpu_sub = _paren_split(get("CPU"))
+    mem_main, mem_sub = _paren_split(get("メモリ"))
+    mm = re.match(r"^(\S+)\s*(.*)$", mem_main)
+    if mm and mm.group(2):
+        mem_main, mem_sub = mm.group(1), (mm.group(2) + " " + mem_sub).strip()
+    ssd_main, _ = _paren_split(get("SSD"))
+    os_main, _ = _paren_split(get("OS"))
+
+    def brand_of(v: str) -> str:
+        for pat, b in ((r"(?i)geforce|rtx|gtx", "geforce"), (r"(?i)radeon", "radeon"), (r"(?i)\barc\b", "arc"),
+                       (r"(?i)intel|インテル|core", "intel"), (r"(?i)amd|ryzen", "amd")):
+            if re.search(pat, v):
+                return b
+        return ""
+
+    wifi = (t.get("無線LAN") or "").translate(_ZEN)
+    if not wifi or re.search(r"無し|なし", wifi):
+        wifi_main, wifi_sub = "非搭載", "※別途オプション"
+    else:
+        w = re.search(r"(?i)Wi-?Fi\s*\d+E?", wifi)
+        wifi_main, wifi_sub = (w.group(0) if w else "搭載"), ("対応" if w else wifi.split("\n")[0][:20])
+    lan = (t.get("LAN") or t.get("有線LAN") or "").translate(_ZEN).split("\n")[0]
+    lm = re.search(r"([\d.]+\s*G(?:b|bE|bps)?|10/100/1000)", lan)
+    size = (t.get("サイズ") or "").translate(_ZEN)
+    nums = re.findall(r"(\d+(?:\.\d+)?)", size)
+    weight = re.search(r"([\d.]+)\s*kg", (t.get("重量") or "").translate(_ZEN), re.I)
+    warranty = (t.get("持込修理保証") or d.get("warranty") or "").translate(_ZEN).strip()
+
+    stock = d.get("stock") or ""
+    return {
+        "brand": brand or "GALLERIA",
+        "series": series,
+        "code": code,
+        "mc": re.sub(r"-SN\d+$", "", d.get("productId") or ""),
+        "basic": [
+            {"key": "GPU", "brand": brand_of(gpu_main), "main": gpu_main, "sub": gpu_sub},
+            {"key": "CPU", "brand": brand_of(cpu_main), "main": cpu_main, "sub": cpu_sub},
+            {"key": "メモリ", "main": mem_main, "sub": mem_sub},
+            {"key": "SSD", "main": ssd_main, "sub": ""},
+            {"key": "OS", "main": os_main, "sub": ""},
+        ],
+        "games": parse_game_fps(src) if src else {},
+        "ports": parse_ports(t.get("入出力ポート") or t.get("インターフェース") or ""),
+        "wifi": {"main": wifi_main, "sub": wifi_sub},
+        "lan": {"main": lm.group(1).replace(" ", "") if lm else (lan[:12] or "—"),
+                "sub": "対応LANポート" if lm else ""},
+        "size": {"W": nums[0], "D": nums[1], "H": nums[2]} if len(nums) >= 3 else {},
+        "weight": weight.group(1) if weight else "",
+        "warranty": f"持込修理保証: {warranty}" if warranty else "",
+        "badge": "即納" if re.search(r"当日|翌日|即納", stock) else stock,
     }
 
 

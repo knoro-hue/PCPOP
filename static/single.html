@@ -5,15 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>個別POP</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="single.css">
 </head>
 <body>
 <aside class="panel">
-  <nav class="tabs"><a href="/">人気ランキングPOP</a><a href="/single.html" class="on">個別POP</a></nav>
+  <nav class="tabs"><a href="/">ランキングPOP</a><a href="/single.html" class="on">個別POP</a></nav>
 
   <section>
     <label class="lbl" for="url">ドスパラ商品URL</label>
     <div class="row">
-      <input id="url" type="url" placeholder="https://www.dospara.co.jp/TC30/MC25585-SN5037.html">
+      <input id="url" type="url" placeholder="https://www.dospara.co.jp/TC30/MC19364-SN5020.html">
       <button id="btnFetch" class="primary">取得</button>
     </div>
     <details id="pasteBox">
@@ -28,24 +29,28 @@
   <div id="editor" hidden>
     <section>
       <h2>表示項目</h2>
-      <label><input type="checkbox" id="optEdition" checked> 同梱版などの付帯名</label>
-      <label><input type="checkbox" id="optCatch" checked> キャッチコピー</label>
-      <label><input type="checkbox" id="optLabels" checked> ラベル（キャンペーン）</label>
-      <label><input type="checkbox" id="optBench" checked> ベンチマーク</label>
-      <label><input type="checkbox" id="optInstall" checked> 分割払い</label>
-      <label><input type="checkbox" id="optStock" checked> 出荷目安</label>
-      <label><input type="checkbox" id="optShort"> スペックを短縮表記にする</label>
+      <label><input type="checkbox" id="optGames" checked> ゲーム性能</label>
+      <label><input type="checkbox" id="optPorts" checked> 端子形状</label>
+      <label><input type="checkbox" id="optInstall" checked> 三井住友分割払（月々）</label>
+      <label><input type="checkbox" id="optSpec" checked> 仕様（Wi-Fi・LAN・サイズ・重量）</label>
+      <label><input type="checkbox" id="optWarranty" checked> 持込修理保証</label>
+      <label><input type="checkbox" id="optBanner" checked> 分割手数料0円バナー</label>
+      <label><input type="checkbox" id="optBadge" checked> 即納（出荷目安）</label>
     </section>
 
     <section>
-      <h2>メイン画像</h2>
+      <h2>ゲーム性能の表</h2>
+      <p class="hint" id="gamesHint"></p>
+      <div class="row">
+        <button id="btnGamesFps" type="button">fps表（FHD / 4K）</button>
+        <button id="btnGamesMark" type="button">3DMarkスコア</button>
+      </div>
+      <p class="hint">表の文字・数字はPOP上で直接クリックして入力・修正できます。</p>
+    </section>
+
+    <section>
+      <h2>PC画像</h2>
       <div id="thumbs" class="thumbs"></div>
-    </section>
-
-    <section>
-      <h2>POPに載せるスペック</h2>
-      <p class="hint">チェックで表示切替。POP上の文字は直接クリックして編集できます。</p>
-      <div id="specToggles"></div>
     </section>
 
     <section>

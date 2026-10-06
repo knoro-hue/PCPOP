@@ -287,5 +287,51 @@ class TestAddMemory(unittest.TestCase):
         self.assertEqual(len(errors), 1)
 
 
+class TestPopSheet(unittest.TestCase):
+    """個別POP (店頭フォーマット) 用の整形。"""
+
+    def test_sheet_from_product_page(self):
+        d = scraper.parse_product(FIX.read_text(encoding="utf-8"), "x")
+        s = d["sheet"]
+        self.assertEqual((s["brand"], s["series"], s["code"], s["mc"]), ("GALLERIA", "X-Series", "XPR7A-R57-GD", "MC25585"))
+        b = {x["key"]: x for x in s["basic"]}
+        self.assertEqual((b["GPU"]["main"], b["GPU"]["sub"], b["GPU"]["brand"]),
+                         ("GeForce RTX 5070 12GB", "(HDMI x1, DisplayPort x3)", "geforce"))
+        self.assertEqual((b["CPU"]["main"], b["CPU"]["sub"], b["CPU"]["brand"]),
+                         ("AMD Ryzen 7 7700", "(3.8GHz-5.3GHz/8コア/16スレッド)", "amd"))
+        self.assertEqual((b["メモリ"]["main"], b["メモリ"]["sub"]), ("16GB", "(16GB×1) (DDR5-4800)"))
+        self.assertEqual(b["SSD"]["main"], "1TB SSD")
+        self.assertEqual(b["OS"]["main"], "Windows 11 Home 64ビット")
+        self.assertEqual(s["ports"]["cols"], ["前面", "背面"])
+        self.assertEqual(s["ports"]["rows"]["2.0"], [2, 4])
+        self.assertEqual(s["ports"]["rows"]["3.2 Gen1 Type-A"], [2, 5])
+        self.assertEqual(s["ports"]["rows"]["3.2 Gen2 Type-C"], [0, 1])
+        self.assertEqual(s["wifi"], {"main": "非搭載", "sub": "※別途オプション"})
+        self.assertEqual(s["lan"], {"main": "2.5Gb", "sub": "対応LANポート"})
+        self.assertEqual(s["size"], {"W": "220", "D": "488", "H": "498"})
+        self.assertEqual(s["weight"], "16")
+        self.assertEqual(s["warranty"], "持込修理保証: 保証期間1年")
+        self.assertEqual(s["badge"], "即納")
+
+    def test_ports_variants(self):
+        p = scraper.parse_ports("左側面:USB3.2 Gen2 Type-C ×1、USB 3.2 Gen1 Type-A x2\n右側面:Thunderbolt 4 ×1、USB4 ×1")
+        self.assertEqual(p["cols"], ["左側面", "右側面"])
+        self.assertEqual(p["rows"]["3.2 Gen2 Type-C"], [1, 0])
+        self.assertEqual(p["rows"]["3.2 Gen1 Type-A"], [2, 0])
+        self.assertEqual(p["rows"]["Thunderbolt 4"], [0, 1])
+        self.assertEqual(p["rows"]["4.0"], [0, 1])
+
+    def test_game_fps_table(self):
+        src = ("<table><tr><th>ゲームタイトル</th><th>FHD</th><th>4K</th></tr>"
+               "<tr><th>Apex Legends</th><td>275 fps</td><td>170fps</td></tr>"
+               "<tr><th>Valorant</th><td>375</td><td>375</td></tr></table>")
+        g = scraper.parse_game_fps(src)
+        self.assertEqual(g["cols"], ["FHD", "4K"])
+        self.assertEqual(g["rows"][0], {"title": "Apex Legends", "vals": ["275 fps", "170 fps"]})
+        self.assertEqual(g["rows"][1]["vals"], ["375 fps", "375 fps"])
+        # fps の無い表 (推奨fps の説明表など見出しに解像度が無いもの) は使わない
+        self.assertEqual(scraper.parse_game_fps("<table><tr><th>ジャンル</th><th>推奨fps</th></tr><tr><th>FPS</th><td>120 fps以上</td></tr></table>"), {})
+
+
 if __name__ == "__main__":
     unittest.main()
