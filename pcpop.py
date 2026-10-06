@@ -17,6 +17,10 @@ from pathlib import Path
 import scraper
 
 STATIC = Path(__file__).resolve().parent / "static"
+# ロゴ・バナーなどの画像を置くフォルダ (POP がファイル名で探して使う。説明は pop_assets/README.txt)
+ASSETS = Path(__file__).resolve().parent / "pop_assets"
+IMG_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+             ".svg": "image/svg+xml", ".gif": "image/gif"}
 MAX_BODY = 20 * 1024 * 1024
 
 
@@ -46,6 +50,15 @@ class Handler(BaseHTTPRequestHandler):
             except scraper.FetchError as e:
                 return self._send(502, str(e).encode(), "text/plain; charset=utf-8")
             return self._send(200, data, ctype)
+        if path == "/api/assets":
+            files = sorted(f.name for f in ASSETS.iterdir() if f.suffix.lower() in IMG_TYPES) if ASSETS.is_dir() else []
+            return self._json(200, {"files": files})
+        if path.startswith("/assets/"):
+            from urllib.parse import unquote
+            f = (ASSETS / unquote(path[len("/assets/"):])).resolve()
+            if ASSETS.resolve() not in f.parents or not f.is_file() or f.suffix.lower() not in IMG_TYPES:
+                return self._send(404, b"not found", "text/plain")
+            return self._send(200, f.read_bytes(), IMG_TYPES[f.suffix.lower()])
         if path == "/":
             path = "/index.html"
         f = (STATIC / path.lstrip("/")).resolve()

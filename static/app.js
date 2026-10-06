@@ -39,6 +39,7 @@ async function load(path, body) {
   setStatus("取得中…");
   try {
     const d = await call(path, body);
+    await assetsReady;
     render(d);
     const w = d.warnings.length ? "\n⚠ " + d.warnings.join("\n⚠ ") : "";
     setStatus(`取得完了: ${d.productId || ""}  仕様${d.specTable.length}項目 / 画像${d.images.length}枚${w}`,
@@ -84,6 +85,36 @@ const ICON = {
   emblem: '<svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z" fill="#c9a24a"/><path d="M12 6l4 2v4c0 2.6-1.7 4.6-4 5.6-2.3-1-4-3-4-5.6V8z" fill="#1b2350"/></svg>',
 };
 
+/* ------------------------------------------------------------ 画像素材 (ツールの pop_assets フォルダ) */
+// ファイル名で探す: 候補の先頭から、拡張子 png / jpg / webp / svg のどれかがあれば使う
+let assets = new Set();
+const assetsReady = fetch("/api/assets").then((r) => r.json()).then((j) => (assets = new Set(j.files.map((f) => f.toLowerCase())))).catch(() => {});
+function asset(...names) {
+  for (const n of names) {
+    for (const ext of ["png", "jpg", "jpeg", "webp", "svg"]) {
+      if (assets.has(`${n}.${ext}`)) return `/assets/${n}.${ext}`;
+    }
+  }
+  return "";
+}
+function gpuAsset(v) {
+  const m = v.match(/RTX\s*(\d{4})/i);
+  if (/geforce|rtx|gtx/i.test(v)) return asset(...(m ? [`gpu_geforce_rtx${m[1]}`] : []), "gpu_geforce_rtx", "gpu_geforce");
+  if (/radeon/i.test(v)) return asset("gpu_radeon");
+  if (/\barc\b/i.test(v)) return asset("gpu_intel_arc");
+  return "";
+}
+function cpuAsset(v) {
+  let m;
+  if ((m = v.match(/Core\s*Ultra\s*(\d)/i))) return asset(`cpu_intel_core_ultra${m[1]}`, "cpu_intel_core_ultra", "cpu_intel");
+  if ((m = v.match(/Core\s*i(\d)/i))) return asset(`cpu_intel_core_i${m[1]}`, "cpu_intel_core", "cpu_intel");
+  if ((m = v.match(/Ryzen\s*(\d)/i))) return asset(`cpu_amd_ryzen${m[1]}`, "cpu_amd_ryzen", "cpu_amd");
+  if (/intel|インテル/i.test(v)) return asset("cpu_intel");
+  if (/amd/i.test(v)) return asset("cpu_amd");
+  return "";
+}
+const assetImg = (src, cls) => el("img", { class: cls, src, alt: "" });
+
 /* ------------------------------------------------------------ render */
 // 縦書き風ラベル (1文字ずつ縦に並べる)
 const vlbl = (t) => el("div", { class: "vlbl" }, ...[...t].map((ch) => el("span", { text: ch })));
@@ -91,12 +122,44 @@ const GAME_TEMPLATE = ["Apex Legends", "Valorant", "Monster Hunter Wilds", "Cybe
 let data = null;
 let gamesMode = "fps";
 
+// data フォルダの fps データ (MC番号ごと) → 表。ゲーム・画質・解像度は左パネルで選ぶ
+const RES = { FHD: "1080p/FHD", WQHD: "1440p/WQHD", "4K": "2160p/4K" };
+function fpsTable(s) {
+  const list = s.fps || {};
+  if (!Object.keys(list).length) return null;
+  const q = $("#fpsQuality").value;
+  const cols = [...document.querySelectorAll("#fpsRes input:checked")].map((x) => x.value);
+  const games = [...document.querySelectorAll("#fpsGames input:checked")].map((x) => x.value).filter((g) => list[g]);
+  return { cols, rows: games.map((g) => ({ title: g.replace("グランド・セフト・オートＶ", "GTA V"),
+    vals: cols.map((c) => list[g]?.[q]?.[RES[c]] || "-") })) };
+}
+
+function buildFpsPanel(s) {
+  const list = s.fps || {};
+  const names = Object.keys(list);
+  $("#fpsBox").hidden = !names.length;
+  if (!names.length) return;
+  const box = $("#fpsGames");
+  const prev = new Set([...box.querySelectorAll("input:checked")].map((x) => x.value));
+  const want = prev.size ? prev : new Set(GAME_TEMPLATE);
+  box.replaceChildren(...names.map((g) => {
+    const cb = el("input", { type: "checkbox", value: g });
+    cb.checked = want.has(g);
+    cb.onchange = () => {
+      if ([...box.querySelectorAll("input:checked")].length > 5) cb.checked = false;  // 枠に入るのは5本まで
+      setGames("fps");
+    };
+    return el("label", {}, cb, " " + g);
+  }));
+}
+
 function gamesTable(d) {
   const s = d.sheet;
   const box = el("div", { class: "games opt-games" }, el("div", { class: "bar", text: "ゲーム性能（3DMarkベンチマーク）" }));
   const tb = el("table");
   if (gamesMode === "fps") {
-    const g = s.games?.rows?.length ? s.games : { cols: ["FHD", "4K"], rows: GAME_TEMPLATE.map((t) => ({ title: t, vals: ["", ""] })) };
+    const g = fpsTable(s) || (s.games?.rows?.length ? s.games
+      : { cols: ["FHD", "4K"], rows: GAME_TEMPLATE.map((t) => ({ title: t, vals: ["", ""] })) });
     const cols = g.cols.slice(0, 3);
     tb.append(el("tr", { class: "hd" }, el("th", { text: "ゲームタイトル" }), ...cols.map((c) => ed("th", "", c))));
     for (const r of g.rows.slice(0, 5)) {
@@ -135,6 +198,7 @@ function portsTable(s) {
 function render(d) {
   data = d;
   const s = d.sheet;
+  buildFpsPanel(s);  // 表を作る前にゲームの選択欄を用意
   const pop = $("#pop");
   pop.className = "pop sheet";
   pop.replaceChildren();
@@ -142,7 +206,8 @@ function render(d) {
   // ヘッダー: ロゴ・シリーズ / Model Name・管理番号・型番
   const head = el("div", { class: "s-head" },
     el("div", { class: "s-brand" },
-      el("div", { class: "s-logo" }, el("span", { class: "em", html: ICON.emblem }), ed("span", "t", s.brand)),
+      asset("logo_" + s.brand.toLowerCase()) ? assetImg(asset("logo_" + s.brand.toLowerCase()), "s-logo-img")
+        : el("div", { class: "s-logo" }, el("span", { class: "em", html: ICON.emblem }), ed("span", "t", s.brand)),
       ed("div", "s-series", s.series)),
     el("div", { class: "s-model" },
       el("div", { class: "s-model-top" }, el("span", { text: "Model Name" }), ed("span", "mc", s.mc)),
@@ -152,7 +217,9 @@ function render(d) {
   const img = el("img", { id: "popImg", src: d.images[0] || "", alt: "" });
   const basic = el("div", { class: "s-basic" }, el("div", { class: "bar", text: "基本構成" }));
   for (const b of s.basic) {
-    const key = b.brand && LOGO[b.brand] ? LOGO[b.brand](b.main) : el("div", { class: "k", text: b.key });
+    const file = b.key === "GPU" ? gpuAsset(b.main) : b.key === "CPU" ? cpuAsset(b.main) : "";
+    const key = file ? assetImg(file, "logo-img")
+      : b.brand && LOGO[b.brand] ? LOGO[b.brand](b.main) : el("div", { class: "k", text: b.key });
     const inline = b.key === "メモリ";
     basic.append(el("div", { class: "row r-" + (b.brand ? "logo" : "text") }, el("div", { class: "kc" }, key),
       el("div", { class: "vc" + (inline ? " inline" : "") }, ed("div", "m", b.main), b.sub ? ed("div", "s", b.sub) : null)));
@@ -186,7 +253,8 @@ function render(d) {
   const warranty = s.warranty ? ed("div", "s-warranty opt-warranty", `${s.warranty} （※別途オプション保証もご加入いただけます）`) : null;
 
   // 分割手数料0円バナー
-  const banner = el("div", { class: "s-banner opt-banner" },
+  const bannerFile = asset("banner_credit");
+  const banner = bannerFile ? el("div", { class: "s-banner img opt-banner" }, assetImg(bannerFile, "")) : el("div", { class: "s-banner opt-banner" },
     el("div", { class: "card" }, ed("b", "", "三井住友カード"), ed("span", "", "ショッピングクレジット")),
     el("div", { class: "msg" },
       el("div", { class: "max" }, el("span", { class: "flag", text: "最大" }), ed("b", "", String(inst?.count || 36)), el("span", { text: "回まで" })),
@@ -229,6 +297,8 @@ function buildPanel(d) {
   $("#gamesHint").textContent = d.sheet.games?.rows?.length
     ? "商品ページのフレームレート表を表示しています。"
     : "商品ページにフレームレート表が見つからないため、fps表は空欄です（POP上で入力できます）。";
+  if (Object.keys(d.sheet.fps || {}).length) $("#gamesHint").textContent = `data フォルダの fps データ（${d.sheet.mc}）を表示しています。`;
+  else if (!d.sheet.games?.rows?.length) $("#gamesHint").textContent += `\n※ data フォルダの fps データに ${d.sheet.mc || "この商品"} がありません。`;
 
   const thumbs = $("#thumbs");
   thumbs.replaceChildren();
@@ -255,6 +325,8 @@ function setGames(mode) {
   applyOptions();
 }
 $("#btnGamesFps").onclick = () => setGames("fps");
+$("#fpsQuality").onchange = () => setGames("fps");
+document.querySelectorAll("#fpsRes input").forEach((cb) => (cb.onchange = () => setGames("fps")));
 $("#btnGamesMark").onclick = () => setGames("mark");
 
 const OPTS = {

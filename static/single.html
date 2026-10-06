@@ -45,6 +45,17 @@
         <button id="btnGamesFps" type="button">fps表（FHD / 4K）</button>
         <button id="btnGamesMark" type="button">3DMarkスコア</button>
       </div>
+      <div id="fpsBox" hidden>
+        <label class="lbl" style="margin-top:8px">画質
+          <select id="fpsQuality"><option value="最高" selected>最高</option><option value="中">中</option></select></label>
+        <div id="fpsRes" class="inline-checks">解像度：
+          <label><input type="checkbox" value="FHD" checked> FHD</label>
+          <label><input type="checkbox" value="WQHD"> WQHD</label>
+          <label><input type="checkbox" value="4K" checked> 4K</label>
+        </div>
+        <div class="lbl" style="font-size:13px">ゲーム（5本まで）</div>
+        <div id="fpsGames" class="fps-games"></div>
+      </div>
       <p class="hint">表の文字・数字はPOP上で直接クリックして入力・修正できます。</p>
     </section>
 

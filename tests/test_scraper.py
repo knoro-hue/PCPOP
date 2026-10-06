@@ -333,5 +333,21 @@ class TestPopSheet(unittest.TestCase):
         self.assertEqual(scraper.parse_game_fps("<table><tr><th>ジャンル</th><th>推奨fps</th></tr><tr><th>FPS</th><td>120 fps以上</td></tr></table>"), {})
 
 
+class TestFpsData(unittest.TestCase):
+    """data フォルダの fps データ (ul_fpsdate.json) を MC番号で引く。"""
+
+    def test_lookup(self):
+        g = scraper.fps_for("MC19364")
+        # 店頭POPの見本 (XPC7A-R57-GD) と同じ値: 画質「最高」の FHD / 4K
+        self.assertEqual(g["Apex Legends"]["最高"]["1080p/FHD"], "275 fps")
+        self.assertEqual(g["Apex Legends"]["最高"]["2160p/4K"], "170 fps")
+        self.assertEqual(g["Cyberpunk 2077"]["最高"]["1080p/FHD"], "145 fps")
+        self.assertEqual(scraper.fps_for("MC00000"), {})
+
+    def test_in_sheet(self):
+        d = scraper.parse_product(FIX.read_text(encoding="utf-8"), "x")
+        self.assertEqual(d["sheet"]["fps"]["Valorant"]["最高"]["1080p/FHD"], "445 fps")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,7 +5,12 @@
 .pop.sheet {
   --red: #e60012; --ink: #111; --gray: #8a8a8a; --blue-row: #dbe8f7;
   padding: 5mm 7mm 4mm; color: var(--ink);
-  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+  /* 文字は基本 メイリオ 太字 */
+  font-family: "メイリオ", Meiryo, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; font-weight: bold;
+  /* 型番・シリーズ: Bahnschrift Condensed 太字 (Windows 標準。無い PC は同梱の Anton) */
+  --cond: "Bahnschrift Condensed", "Bahnschrift", "Anton", "Arial Narrow", sans-serif;
+  /* 価格: Impact 太字 (無い PC は同梱の Anton) */
+  --impact: Impact, "Anton", "Haettenschweiler", sans-serif;
 }
 .sheet .bar { background: #111; color: #fff; font-weight: bold; text-align: center; font-size: 3.4mm; padding: .9mm 0; }
 
@@ -17,11 +22,11 @@
 }
 .s-logo .em svg { width: 9mm; height: 9mm; display: block; }
 .s-logo .t { font: 800 italic 7.4mm/1 "Poppins", sans-serif; letter-spacing: .02em; }
-.s-series { font: 900 11.5mm/1.1 "Arial Black", "Yu Gothic UI", sans-serif; letter-spacing: -.02em; margin-top: 1.5mm; white-space: nowrap; }
+.s-series { font-family: var(--cond); font-weight: bold; font-stretch: condensed; font-size: 13mm; line-height: 1.05; margin-top: 1.5mm; white-space: nowrap; }
 .s-model { flex: 1; min-width: 0; border-bottom: .5mm solid #111; }
-.s-model-top { display: flex; justify-content: space-between; font: bold 3.6mm/1 "Arial", sans-serif; }
+.s-model-top { display: flex; justify-content: space-between; font-size: 3.6mm; line-height: 1; }
 .s-model-top .mc { font-size: 3.2mm; }
-.s-code { font: 400 24mm/1.15 "Anton", "Impact", sans-serif; white-space: nowrap; overflow: hidden; text-align: right; letter-spacing: .01em; }
+.s-code { font-family: var(--cond); font-weight: bold; font-stretch: condensed; font-size: 24mm; line-height: 1.15; white-space: nowrap; overflow: hidden; text-align: right; }
 
 /* PC画像 + 基本構成 */
 .s-mid { display: flex; gap: 5mm; height: 84mm; margin-top: 4mm; flex-shrink: 0; }
@@ -75,7 +80,7 @@
 .s-price { flex-shrink: 0; text-align: center; margin-top: 2mm; }
 .s-price .amt { display: flex; justify-content: center; align-items: flex-end; color: var(--red); line-height: .95; }
 .s-price .n {
-  font: 400 46mm/1 "Anton", "Impact", sans-serif; letter-spacing: .01em; white-space: nowrap; max-width: 160mm; overflow: hidden;
+  font-family: var(--impact); font-weight: bold; font-size: 46mm; line-height: 1; letter-spacing: .06em; white-space: nowrap; max-width: 160mm; overflow: hidden;
   text-shadow: .5mm .5mm 0 rgba(0,0,0,.18);
 }
 .s-price .unit { display: flex; flex-direction: column; align-items: center; margin-left: 2mm; padding-bottom: 1.5mm; }
@@ -120,3 +125,9 @@
 .s-banner .zero b { font-size: 11mm; color: #ffd400; margin: 0 .5mm; }
 
 .s-badge { position: absolute; right: 6mm; bottom: 3mm; font-weight: bold; font-size: 3.6mm; }
+
+/* pop_assets フォルダの画像を使う時 */
+.s-logo-img { display: block; width: 100%; height: 15mm; object-fit: contain; object-position: left center; }
+.s-basic .logo-img { max-width: 26mm; max-height: 15mm; object-fit: contain; display: block; }
+.s-banner.img { background: none; display: block; }
+.s-banner.img img { width: 100%; height: 100%; object-fit: contain; display: block; }

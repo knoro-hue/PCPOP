@@ -14,6 +14,7 @@ import html
 import json
 import os
 import re
+from pathlib import Path
 import shutil
 import subprocess
 import tempfile
@@ -1004,6 +1005,34 @@ def parse_game_fps(src: str) -> dict:
     return {}
 
 
+# ゲーム性能 (fps) のデータ: ツールの data フォルダの *.json (例: ul_fpsdate.json)
+#   {"MC19364": {"game_list": {"Apex Legends": {"最高": {"1080p/FHD": "275 fps", ...}, "中": {...}}, ...}}, ...}
+DATA_DIR = Path(__file__).resolve().parent / "data"
+_FPS_CACHE: dict = {"key": None, "data": {}}
+
+
+def fps_data() -> dict:
+    """data/*.json を読み込んで MC番号 → game_list の辞書にする (ファイルを差し替えたら自動で読み直す)。"""
+    files = sorted(DATA_DIR.glob("*.json")) if DATA_DIR.is_dir() else []
+    key = tuple((f.name, f.stat().st_mtime, f.stat().st_size) for f in files)
+    if key != _FPS_CACHE["key"]:
+        merged = {}
+        for f in files:
+            try:
+                d = json.loads(f.read_text(encoding="utf-8-sig"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(d, dict):
+                merged.update({k.upper(): v for k, v in d.items() if isinstance(v, dict) and "game_list" in v})
+        _FPS_CACHE.update(key=key, data=merged)
+    return _FPS_CACHE["data"]
+
+
+def fps_for(mc: str) -> dict:
+    """MC番号のゲーム別 fps ({ゲーム: {画質: {解像度: 'xx fps'}}})。無ければ {}。"""
+    return (fps_data().get((mc or "").upper()) or {}).get("game_list") or {}
+
+
 def pop_sheet(d: dict, src: str = "") -> dict:
     """店頭POP (基本構成・ゲーム性能・端子・仕様) 用に商品データを整形する。"""
     t = {r["label"]: r["value"] for r in d.get("specTable", [])}
@@ -1061,6 +1090,7 @@ def pop_sheet(d: dict, src: str = "") -> dict:
             {"key": "OS", "main": os_main, "sub": ""},
         ],
         "games": parse_game_fps(src) if src else {},
+        "fps": fps_for(re.sub(r"-SN\d+$", "", d.get("productId") or "")),
         "ports": parse_ports(t.get("入出力ポート") or t.get("インターフェース") or ""),
         "wifi": {"main": wifi_main, "sub": wifi_sub},
         "lan": {"main": lm.group(1).replace(" ", "") if lm else (lan[:12] or "—"),

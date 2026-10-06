@@ -153,3 +153,8 @@ table.raw td { white-space: pre-wrap; }
 .tabs a:last-child { border-right: 0; }
 .tabs a.on { background: var(--blue); color: #fff; }
 .tabs a:not(.on):hover { background: #e6edf8; }
+
+.inline-checks { font-size: 12px; margin: 6px 0; }
+.inline-checks label { display: inline !important; margin-right: 8px; }
+.fps-games { display: grid; grid-template-columns: 1fr 1fr; font-size: 12px; }
+.fps-games label { font-size: 12px !important; margin: 2px 0 !important; }

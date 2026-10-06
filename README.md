@@ -24,7 +24,18 @@ Windows ならエクスプローラーで `start.bat` をダブルクリック�
 3. 左パネルで各項目の表示／非表示、PC画像を選ぶ
 4. 「印刷 / PDF保存 (A4)」→ 印刷ダイアログで用紙 A4・**背景のグラフィックを ON**（画像の読み込みが終わってから印刷します）
 
-型番・価格のフォントは Anton を同梱（`static/fonts`、SIL Open Font License）。
+フォント: 型番・シリーズ＝Bahnschrift Condensed 太字、価格＝Impact 太字（文字間隔広め）、その他＝メイリオ 太字
+（どれも Windows 標準。無い PC では同梱の Anton で代用）。
+
+### 画像素材（pop_assets フォルダ）
+`pop_assets` に決まったファイル名で画像を置くと、POP の該当箇所がその画像になります（無いものは文字のロゴで表示）。
+例: `logo_galleria.png`（左上ロゴ）、`gpu_geforce.png`、`cpu_intel_core_ultra7.png`、`cpu_amd_ryzen.png`、`banner_credit.png`（下部バナー）。
+ファイル名の一覧は `pop_assets/README.txt`。
+
+### ゲーム性能（data フォルダ）
+`data` の `*.json`（`ul_fpsdate.json` と同じ形式）から、商品の MC 番号で fps を探して表に入れます。
+画質（最高 / 中）・解像度（FHD / WQHD / 4K）・ゲーム（5本まで）は左パネルで選択。初期値は 最高・FHD/4K・
+Apex Legends / Valorant / Monster Hunter Wilds / Cyberpunk 2077。JSON を差し替えると次の「取得」から反映されます。
 
 ### 「timed out」などで取得できない場合（社内ネットワーク）
 1. まず直接接続を試し、失敗すると **Windows のプロキシ設定（ブラウザと同じ）経由** で自動的に再取得します。
