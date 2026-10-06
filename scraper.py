@@ -536,7 +536,42 @@ def fetch_ranking_pages(urls: list[str]) -> tuple[list[dict], list[str]]:
 
     with ThreadPoolExecutor(max_workers=max(1, len(urls))) as ex:
         results = list(ex.map(lambda a: one(*a), enumerate(urls)))
-    return [s for secs, _ in results for s in secs], [e for _, e in results if e]
+    sections = [s for secs, _ in results for s in secs]
+    errors = [e for _, e in results if e]
+    errors += add_memory(sections)
+    return sections, errors
+
+
+def fetch_memory(url: str) -> str:
+    """商品ページのスペック表から「メモリ」(例: 16GB (16GB×1) (DDR5-4800))。"""
+    d = parse_product(fetch_html(url), url)
+    return next((k["display"] for k in d["keySpecs"] if k["label"] == "メモリ"), "")
+
+
+def add_memory(sections: list[dict]) -> list[str]:
+    """デスクトップ (/TC30 など: 画面サイズの無いランキング) の各モデルにメモリを付ける。
+
+    ランキングのページにはメモリが無いため、ここだけ各モデルの商品ページを読む (OS 欄の代わりに表示)。
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    items = [it for s in sections if not any(i.get("display") for i in s["items"]) for it in s["items"]]
+    urls = list(dict.fromkeys(it["url"] for it in items if it.get("url")))
+    if not urls:
+        return []
+
+    def one(url: str):
+        try:
+            return url, fetch_memory(url)
+        except (FetchError, ParseError):
+            return url, ""
+
+    with ThreadPoolExecutor(max_workers=min(6, len(urls))) as ex:
+        mem = dict(ex.map(one, urls))
+    for it in items:
+        it["memory"] = mem.get(it["url"], "")
+    missing = sum(1 for u in urls if not mem.get(u))
+    return [f"メモリを取得できなかったモデル: {missing}件（OSを表示します）"] if missing else []
 
 
 def _urllib_bytes(url: str, timeout: int, accept: str = "*/*") -> tuple[bytes, str | None]:

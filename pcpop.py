@@ -78,7 +78,7 @@ class Handler(BaseHTTPRequestHandler):
                 if req.get("html"):  # 貼り付けたページ
                     url = (req.get("url") or "").strip()
                     sections = scraper.parse_ranking_sections(req["html"], url or scraper.BASE)
-                    errors = []
+                    errors = scraper.add_memory(sections)
                 else:  # 指定ページ (既定: /TC30 と /TC143) をまとめて取得
                     urls = [u.strip() for u in (req.get("urls") or scraper.RANKING_PAGES) if u.strip()]
                     sections, errors = scraper.fetch_ranking_pages(urls)

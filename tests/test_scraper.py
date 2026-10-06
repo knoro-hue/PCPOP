@@ -246,5 +246,46 @@ class TestTC143Rendered(unittest.TestCase):
             scraper.parse_ranking_sections(self.raw, "https://www.dospara.co.jp/TC143")
 
 
+
+
+class TestAddMemory(unittest.TestCase):
+    """デスクトップ (/TC30) だけ商品ページからメモリを付ける。ノート (/TC143) は読まない。"""
+
+    def test_desktop_only(self):
+        d = Path(__file__).parent / "fixtures"
+        product = (d / "MC25585-SN5037.html").read_text(encoding="utf-8")
+        desk = scraper.parse_ranking_sections((d / "tc30_rendered.html").read_text(encoding="utf-8"))
+        note = scraper.parse_ranking_sections((d / "tc143_rendered.html").read_text(encoding="utf-8"))
+        opened = []
+
+        def fake(url, timeout=8):
+            opened.append(url)
+            return product
+
+        orig = scraper.fetch_html
+        scraper.fetch_html = fake
+        try:
+            errors = scraper.add_memory(desk + note)
+        finally:
+            scraper.fetch_html = orig
+        self.assertEqual(errors, [])
+        self.assertEqual(desk[0]["items"][0]["memory"], "16GB (16GB×1) (DDR5-4800)")
+        self.assertNotIn("memory", note[0]["items"][0])
+        self.assertTrue(opened and all("/TC30/" in u for u in opened))
+        self.assertEqual(len(opened), len(set(opened)))  # 同じ商品ページは1回だけ
+
+    def test_failure_falls_back(self):
+        d = Path(__file__).parent / "fixtures"
+        desk = scraper.parse_ranking_sections((d / "tc30_rendered.html").read_text(encoding="utf-8"))
+        orig = scraper.fetch_html
+        scraper.fetch_html = lambda url, timeout=8: (_ for _ in ()).throw(scraper.FetchError("offline"))
+        try:
+            errors = scraper.add_memory(desk)
+        finally:
+            scraper.fetch_html = orig
+        self.assertEqual(desk[0]["items"][0]["memory"], "")
+        self.assertEqual(len(errors), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
