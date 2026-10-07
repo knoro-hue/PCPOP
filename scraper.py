@@ -946,40 +946,84 @@ def _paren_split(v: str) -> tuple[str, str]:
     return (m.group(1).strip(), m.group(2)) if m else (v, "")
 
 
+def _split_top(text: str) -> list[str]:
+    """「、」「,」「;」で区切る。ただし括弧の中の区切り (例: "(Type-C、映像出力…)") では切らない。"""
+    out, buf, depth = [], [], 0
+    for ch in text:
+        if ch in "(（[【":
+            depth += 1
+        elif ch in ")）]】":
+            depth = max(0, depth - 1)
+        if depth == 0 and ch in "、,，;；":
+            out.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    out.append("".join(buf))
+    return [x.strip() for x in out if x.strip()]
+
+
 def _port_name(raw: str) -> str:
+    """USB の書き方の揺れをまとめて表の行名にする。
+
+    例: "USB3.2 Gen2 (Type-C、映像出力 DisplayPort1.4 対応…)" / "USB 3.2 Gen 2 Type-C" / "USB Type-C (USB3.2 Gen2)"
+        → "3.2 Gen2 Type-C"、"USB3.2 Gen1 (Type-A)" → "3.2 Gen1 Type-A"、"USB4 (Type-C)" → "4.0"
+    """
     n = re.sub(r"\s+", " ", raw.translate(_ZEN)).strip()
-    n = re.sub(r"^USB\s*", "", n, flags=re.I)
-    if re.match(r"(?i)thunderbolt\s*(\d)", n):
-        return "Thunderbolt " + re.match(r"(?i)thunderbolt\s*(\d)", n).group(1)
-    if re.match(r"^4(\.0)?\b", n):
+    tb = re.search(r"(?i)thunderbolt\s*(\d)", n)
+    if tb:
+        return f"Thunderbolt {tb.group(1)}"
+    if re.search(r"(?i)USB\s*4(?![.\d])|USB\s*4\.0|40\s*Gbps", n):
         return "4.0"
-    if re.match(r"^2\.0", n):
+    typ = re.search(r"(?i)Type\s*-?\s*([AC])\b|USB\s*-\s*([AC])\b", n)
+    typ = (typ.group(1) or typ.group(2)).upper() if typ else ""
+    ver = re.search(r"(?i)USB\s*(\d)\.(\d)", n) or re.search(r"(?<![\d.])([23])\.([0-2])(?![\d.])", n)
+    gen = re.search(r"(?i)Gen\s*(\d)\s*(?:x\s*(2))?", n)
+    gbps = re.search(r"(?i)(\d+)\s*Gbps", n)
+    v = f"{ver.group(1)}.{ver.group(2)}" if ver else ""
+    if v == "2.0":
         return "2.0"
-    if re.match(r"^3\.0", n):
+    if v == "3.0" and typ != "C":
         return "3.0"
-    m = re.match(r"(?i)^3\.[12]\s*(Gen\s*2x2|Gen\s*2|Gen\s*1)?\s*(Type-?([AC]))?", n)
-    if m:
-        gen = re.sub(r"\s+", "", m.group(1) or "Gen1").replace("gen", "Gen")
-        return f"3.2 {gen} Type-{(m.group(3) or 'A').upper()}"
-    return n
+    if gen:
+        g = "Gen2x2" if gen.group(2) else f"Gen{gen.group(1)}"
+    elif gbps:  # 世代の書いていないもの: 速度で判断
+        g = {"5": "Gen1", "10": "Gen2", "20": "Gen2x2"}.get(gbps.group(1), "Gen1")
+    elif v == "3.1":
+        g = "Gen2"
+    elif v or typ:
+        g = "Gen1"
+    else:
+        return n
+    return f"3.2 {g} Type-{typ or ('C' if g == 'Gen2x2' else 'A')}"
+
+
+def _is_usb_item(item: str) -> bool:
+    if re.search(r"(?i)usb|thunderbolt", item):
+        return True
+    return bool(re.search(r"(?i)type\s*-?\s*c", item)) and not re.search(r"(?i)hdmi", item)
 
 
 def parse_ports(value: str) -> dict:
-    """入出力ポート '前面:USB 2.0 ×2 、…\n背面:…' → {"cols": ["前面","背面"], "rows": {"2.0": [2, 4], …}}"""
+    """入出力ポート '前面:USB 2.0 ×2 、…\n背面:…' → {"cols": ["前面","背面"], "rows": {"2.0": [2, 4], …}}
+
+    「前面:」「左側面:」などの位置ごとに数える (位置の書いていないものは1列)。括弧内の「、」では区切らない。
+    """
     cols, counts = [], {}
     for line in (value or "").translate(_ZEN).split("\n"):
-        m = re.match(r"^\s*([^:：]{1,6})[:：](.*)$", line)
-        side, body = (m.group(1).strip(), m.group(2)) if m else ("", line)
-        items = [x for x in re.split(r"[、,]", body) if re.search(r"(?i)usb|thunderbolt", x)]
-        if not items:
-            continue
-        if side not in cols:
-            cols.append(side)
-        for it in items:
-            c = re.search(r"[×xX]\s*(\d+)\s*$", it.strip())
-            name = _port_name(re.sub(r"[×xX]\s*\d+\s*$", "", it.strip()))
+        side = ""
+        for it in _split_top(line):
+            m = re.match(r"^([^:：()（）]{1,6})[:：]\s*(.*)$", it)
+            if m:  # 「背面:」が同じ行の途中から始まることもある
+                side, it = m.group(1).strip(), m.group(2)
+            if not _is_usb_item(it):
+                continue
+            c = re.findall(r"[×xX*＊]\s*(\d+)(?!\s*(?:Gbps|W|mm))", re.sub(r"(?i)Gen\s*\d\s*x\s*2", "", it))
+            name = _port_name(re.sub(r"[×xX*＊]\s*\d+\s*$", "", it))
+            if side not in cols:
+                cols.append(side)
             counts.setdefault(name, {})
-            counts[name][side] = counts[name].get(side, 0) + (int(c.group(1)) if c else 1)
+            counts[name][side] = counts[name].get(side, 0) + (int(c[-1]) if c else 1)
     rows = {n: [counts.get(n, {}).get(c, 0) for c in cols] for n in PORT_ROWS_A + PORT_ROWS_C}
     return {"cols": [c or "数" for c in cols], "rows": rows} if cols else {}
 

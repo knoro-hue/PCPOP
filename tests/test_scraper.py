@@ -384,5 +384,36 @@ class TestNoteSheet(unittest.TestCase):
         self.assertIsNone(scraper.parse_product(FIX.read_text(encoding="utf-8"), "x")["sheet"]["note"])
 
 
+class TestPortVariants(unittest.TestCase):
+    """入出力ポートの USB 表記ゆれ。"""
+
+    def rows(self, text):
+        p = scraper.parse_ports(text)
+        return {n: c for n, c in p["rows"].items() if sum(c)}
+
+    def test_type_inside_parentheses(self):
+        # 括弧の中の「、」で切らない: Gen2 は Type-C、Gen1 は Type-A。HDMI の "Type A" は数えない
+        src = ("USB3.2 Gen2 (Type-C、映像出力 DisplayPort1.4 対応、PD対応/65W) ×1、USB3.2 Gen1 (Type-A) ×2、"
+               "HDMI 2.1 Type A ×1、マイク入力・ヘッドフォン出力 共用端子 (3.5mm 4極 CTIA) ×1")
+        self.assertEqual(self.rows(src), {"3.2 Gen1 Type-A": [2], "3.2 Gen2 Type-C": [1]})
+        n = scraper._note_info({"入出力ポート": src}, lambda *k: "14インチ 非光沢液晶" if "ディスプレイ" in k else "", "", "", "")
+        self.assertEqual(n["usb"], ["3.2 Gen1 Type-A X 2", "3.2 Gen2 Type-C X 1"])
+        self.assertTrue(n["hdmi"])
+
+    def test_other_spellings(self):
+        self.assertEqual(self.rows("USB Type-C (USB3.2 Gen2 / 10Gbps) x1, USB 3.2 Gen 1 Type-A x2, "
+                                   "Thunderbolt 4 (USB Type-C) ×1, USB4 (Type-C) ×1"),
+                         {"3.2 Gen1 Type-A": [2], "3.2 Gen2 Type-C": [1], "4.0": [1], "Thunderbolt 4": [1]})
+        self.assertEqual(self.rows("USB3.1 Gen1 Type-A×2、USB3.2 Gen2x2 Type-C ×1、USB 2.0 Type-A ×1、USB-C (5Gbps) ×1"),
+                         {"2.0": [1], "3.2 Gen1 Type-A": [2], "3.2 Gen1 Type-C": [1], "3.2 Gen2x2 Type-C": [1]})
+
+    def test_sides_on_one_line(self):
+        # 商品データ (productJson) では「，背面:」が同じ行に続く
+        p = scraper.parse_ports("前面:USB 2.0 ×2 、USB 3.2 Gen1 Type-C ×1，背面:USB 2.0 ×4 、USB 3.2 Gen2 Type-C ×1")
+        self.assertEqual(p["cols"], ["前面", "背面"])
+        self.assertEqual(p["rows"]["2.0"], [2, 4])
+        self.assertEqual(p["rows"]["3.2 Gen2 Type-C"], [0, 1])
+
+
 if __name__ == "__main__":
     unittest.main()
