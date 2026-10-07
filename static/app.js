@@ -236,10 +236,9 @@ function render(d) {
       el("div", { class: "max" }, el("span", { class: "flag", text: "最大" }), ed("b", "", String(inst?.count || 36)), el("span", { text: "回まで" })),
       el("div", { class: "zero" }, el("span", { text: "分割手数料" }), el("b", { text: "0" }), el("span", { text: "円!!" }))));
 
-  const badge = s.badge ? ed("div", "s-badge opt-badge", s.badge) : null;
 
   const body = note ? noteBody(d, img) : deskBody(d, img);
-  pop.append(head, ...body.top, price, ...body.bottom, warranty, banner, badge);
+  pop.append(head, ...body.top, price, ...body.bottom, warranty, banner);
   buildPanel(d);
   applyOptions();
   fitSheet();
@@ -401,7 +400,7 @@ $("#btnGamesMark").onclick = () => setGames("mark");
 
 const OPTS = {
   optGames: ".opt-games", optPorts: ".opt-ports", optInstall: ".opt-install", optSpec: ".opt-spec",
-  optWarranty: ".opt-warranty", optBanner: ".opt-banner", optBadge: ".opt-badge",
+  optWarranty: ".opt-warranty", optBanner: ".opt-banner",
 };
 function applyOptions() {
   for (const [id, sel] of Object.entries(OPTS)) {

@@ -131,11 +131,12 @@
 .s-banner .zero { font-weight: 900; font-size: 7mm; }
 .s-banner .zero b { font-size: 11mm; color: #ffd400; margin: 0 .5mm; }
 
-.s-badge { position: absolute; right: 6mm; bottom: 3mm; font-weight: bold; font-size: 3.6mm; }
 
 /* pop_assets フォルダの画像を使う時 */
 .s-logo-img { display: block; width: 100%; height: 15mm; object-fit: contain; object-position: left center; }
-.s-basic .logo-img { max-width: 26mm; max-height: 15mm; object-fit: contain; display: block; }
+/* GPU / CPU のロゴ画像: 元の画像サイズに関係なく枠に収める (デスクトップ・ノート共通) */
+.logo-img { display: block; width: auto; height: auto; max-width: 24mm; max-height: 14mm; object-fit: contain; }
+.s-basic .logo-img { max-width: 26mm; max-height: 15mm; }
 .s-banner.img { background: none; display: block; }
 .s-banner.img img { width: 100%; height: 100%; object-fit: contain; display: block; }
 
@@ -181,7 +182,7 @@
 /* CPU・GPU・メモリ・SSD・OS (濃いグレーの枠) */
 .note .n-box { background: #4a4a4a; color: #fff; border: .6mm solid #9a9a9a; margin: 3mm 0 0; flex-shrink: 0; }
 .note .n-row { display: flex; align-items: center; gap: 4mm; padding: 1.6mm 4mm 1.6mm 8mm; border-bottom: .3mm solid #888; min-height: 16mm; }
-.note .n-row .lg { width: 24mm; flex-shrink: 0; display: flex; justify-content: center; }
+.note .n-row .lg { width: 24mm; height: 14mm; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .note .n-row .tx { min-width: 0; flex: 1; }
 .note .n-row .m { font-size: 6mm; line-height: 1.25; white-space: nowrap; overflow: hidden; }
 .note .n-row .s { font-size: 3mm; margin-top: .4mm; }

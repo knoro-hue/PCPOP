@@ -1125,7 +1125,6 @@ def pop_sheet(d: dict, src: str = "") -> dict:
     weight = re.search(r"([\d.]+)\s*kg", (t.get("重量") or "").translate(_ZEN), re.I)
     warranty = (t.get("持込修理保証") or d.get("warranty") or "").translate(_ZEN).strip()
 
-    stock = d.get("stock") or ""
     mc = re.sub(r"-SN\d+$", "", d.get("productId") or "")
     note = _note_info(t, get, gpu_main, gpu_sub, mc)
     return {
@@ -1151,7 +1150,6 @@ def pop_sheet(d: dict, src: str = "") -> dict:
         "size": {"W": nums[0], "D": nums[1], "H": nums[2]} if len(nums) >= 3 else {},
         "weight": weight.group(1) if weight else "",
         "warranty": f"持込修理保証: {warranty}" if warranty else "",
-        "badge": "即納" if re.search(r"当日|翌日|即納", stock) else stock,
     }
 
 

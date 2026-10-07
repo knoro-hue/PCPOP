@@ -311,7 +311,6 @@ class TestPopSheet(unittest.TestCase):
         self.assertEqual(s["size"], {"W": "220", "D": "488", "H": "498"})
         self.assertEqual(s["weight"], "16")
         self.assertEqual(s["warranty"], "持込修理保証: 保証期間1年")
-        self.assertEqual(s["badge"], "即納")
 
     def test_ports_variants(self):
         p = scraper.parse_ports("左側面:USB3.2 Gen2 Type-C ×1、USB 3.2 Gen1 Type-A x2\n右側面:Thunderbolt 4 ×1、USB4 ×1")
