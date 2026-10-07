@@ -1022,15 +1022,63 @@ def fps_data() -> dict:
                 d = json.loads(f.read_text(encoding="utf-8-sig"))
             except (OSError, ValueError):
                 continue
-            if isinstance(d, dict):
-                merged.update({k.upper(): v for k, v in d.items() if isinstance(v, dict) and "game_list" in v})
+            if isinstance(d, dict):  # 同じ MC番号の fps (game_list) と用途 (spec_list) は別ファイルでもまとめる
+                for k, v in d.items():
+                    if isinstance(v, dict):
+                        merged.setdefault(k.upper(), {}).update(v)
         _FPS_CACHE.update(key=key, data=merged)
     return _FPS_CACHE["data"]
+
+
+def uses_for(mc: str) -> dict:
+    """MC番号の「主な用途」の目安 (ul_specdate.json: {"動画視聴": "◎", "office": "◎", ...})。無ければ {}。"""
+    return (fps_data().get((mc or "").upper()) or {}).get("spec_list") or {}
 
 
 def fps_for(mc: str) -> dict:
     """MC番号のゲーム別 fps ({ゲーム: {画質: {解像度: 'xx fps'}}})。無ければ {}。"""
     return (fps_data().get((mc or "").upper()) or {}).get("game_list") or {}
+
+
+def _note_info(t: dict, get, gpu_main: str, gpu_sub: str, mc: str) -> dict | None:
+    """ノートPC用の項目。液晶のサイズ (インチ) がスペックにあればノートとみなす。"""
+    disp = (get("ディスプレイ", "液晶パネル", "液晶", "モニタ") or "").translate(_ZEN)
+    inch = re.search(r"(\d+(?:\.\d+)?)\s*(?:インチ|型)", disp)
+    if not inch:
+        return None
+    hz = re.search(r"(\d{2,3})\s*Hz", disp, re.I)
+    res = re.search(r"(\d{3,4})\s*[×xX]\s*(\d{3,4})", disp)
+    weight = re.search(r"([\d.]+)\s*kg", (t.get("重量") or "").translate(_ZEN), re.I)
+    wifi = (t.get("無線LAN") or "").translate(_ZEN)
+    wv = re.search(r"(?i)Wi-?Fi\s*(\d+E?)", wifi)
+    std = re.search(r"802\.11\s*([a-z]+(?:/[a-z]+)*)", wifi, re.I)
+    lan = (t.get("LAN") or t.get("有線LAN") or "").translate(_ZEN)
+    lm = re.search(r"([\d.]+\s*G(?:b|bE|bps)?)", lan)
+    io = (t.get("入出力ポート") or t.get("インターフェース") or "").translate(_ZEN)
+    ports = parse_ports(io)
+    usb = [f"{n} X {sum(v)}" for n, v in (ports.get("rows") or {}).items() if sum(v)]
+    size = (t.get("サイズ") or "").translate(_ZEN)
+    nums = re.findall(r"(\d+(?:\.\d+)?)", size)
+    # GPU が CPU 内蔵なら「(CPU内蔵)」
+    if not gpu_sub and re.search(r"内蔵|Arc\s*グラフィックス|Iris|UHD|Radeon\s*(?:\d{3}M|グラフィックス)", gpu_main + get("GPU", "グラフィック機能")):
+        gpu_sub = "(CPU内蔵)"
+    gpu_main = re.sub(r"\s*\(CPU内蔵\)", "", gpu_main)
+    return {
+        "inch": inch.group(1),
+        "panel": "非光沢液晶" if "非光沢" in disp else ("光沢液晶" if "光沢" in disp else "液晶"),
+        "hz": hz.group(1) if hz else "60",
+        "res": f"{res.group(1)} x {res.group(2)}" if res else "",
+        "weight": weight.group(1) if weight else "",
+        "gpu": {"main": gpu_main, "sub": gpu_sub},
+        "wifi": {"main": f"{wv.group(1)} 対応" if wv else ("非搭載" if re.search(r"無し|なし", wifi) or not wifi else "搭載"),
+                 "sub": f"({std.group(1)})" if std else ""},
+        "lan": {"main": lm.group(1).replace(" ", "") if lm else "非搭載", "sub": "対応LANポート" if lm else ""},
+        "hdmi": bool(re.search(r"HDMI", io, re.I)),
+        "usb": usb,
+        "size": {"W": nums[0], "D": nums[1], "H": nums[2]} if len(nums) >= 3 else {},
+        "sizeNote": "(ゴム足含む)" if "ゴム足" in size else "",
+        "uses": uses_for(mc),
+    }
 
 
 def pop_sheet(d: dict, src: str = "") -> dict:
@@ -1043,12 +1091,13 @@ def pop_sheet(d: dict, src: str = "") -> dict:
     m = re.match(r"^(GALLERIA|THIRDWAVE|raytrek|Diginnos)\s+([A-Za-z0-9][A-Za-z0-9-]*)", model, re.I)
     brand = m.group(1).upper() if m else ""
     code = m.group(2) if m else (model.split(" ")[0] if model else "")
-    series = f"{code[0].upper()}-Series" if brand == "GALLERIA" and code[:1].isalpha() else (m.group(1) if m else "")
+    series = f"{code[0].upper()}-Series" if brand == "GALLERIA" and code[:1].isalpha() else ""
 
     gpu_main, gpu_sub = _paren_split(get("GPU", "グラフィック機能", "グラフィックボード"))
     gpu_main = re.sub(r"\s*GDDR\d+X?\b", "", re.sub(r"^NVIDIA\s+", "", gpu_main)).strip()
     gpu_sub = gpu_sub.replace(",", ", ").replace(",  ", ", ")
     cpu_main, cpu_sub = _paren_split(get("CPU"))
+    cpu_main = re.sub(r"\s*プロセッサー\s*", " ", cpu_main).strip()
     mem_main, mem_sub = _paren_split(get("メモリ"))
     mm = re.match(r"^(\S+)\s*(.*)$", mem_main)
     if mm and mm.group(2):
@@ -1077,11 +1126,15 @@ def pop_sheet(d: dict, src: str = "") -> dict:
     warranty = (t.get("持込修理保証") or d.get("warranty") or "").translate(_ZEN).strip()
 
     stock = d.get("stock") or ""
+    mc = re.sub(r"-SN\d+$", "", d.get("productId") or "")
+    note = _note_info(t, get, gpu_main, gpu_sub, mc)
     return {
+        "note": note,  # ノートPCの時だけ (画面・重量・USB の内訳・用途の目安)
         "brand": brand or "GALLERIA",
         "series": series,
         "code": code,
         "mc": re.sub(r"-SN\d+$", "", d.get("productId") or ""),
+        "pid": d.get("productId") or "",
         "basic": [
             {"key": "GPU", "brand": brand_of(gpu_main), "main": gpu_main, "sub": gpu_sub},
             {"key": "CPU", "brand": brand_of(cpu_main), "main": cpu_main, "sub": cpu_sub},
@@ -1090,7 +1143,7 @@ def pop_sheet(d: dict, src: str = "") -> dict:
             {"key": "OS", "main": os_main, "sub": ""},
         ],
         "games": parse_game_fps(src) if src else {},
-        "fps": fps_for(re.sub(r"-SN\d+$", "", d.get("productId") or "")),
+        "fps": fps_for(mc),
         "ports": parse_ports(t.get("入出力ポート") or t.get("インターフェース") or ""),
         "wifi": {"main": wifi_main, "sub": wifi_sub},
         "lan": {"main": lm.group(1).replace(" ", "") if lm else (lan[:12] or "—"),

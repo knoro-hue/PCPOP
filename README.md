@@ -27,6 +27,13 @@ Windows ならエクスプローラーで `start.bat` をダブルクリック�
 フォント: 型番・シリーズ＝Bahnschrift Condensed 太字、価格＝Impact 太字（文字間隔広め）、その他＝メイリオ 太字
 （どれも Windows 標準。無い PC では同梱の Anton で代用）。
 
+### ノートPC（GALLERIA ノート / THIRDWAVE ノート）
+スペックに液晶サイズ（インチ）がある商品はノート用のレイアウトになります。
+- 重量の丸・画面サイズ（インチ / 非光沢液晶）・リフレッシュレート（Hz）・解像度
+- 右の表: `data/ul_specdate.json` に MC番号があれば「主な用途 / 目安」（THIRDWAVE ノート）、無ければゲーム性能（GALLERIA ノート）
+- 濃いグレーの枠に CPU / GPU / メモリ / SSD / OS、下に「インターフェース仕様」（Wi-Fi・LAN・HDMI・USB の内訳・サイズ）
+- THIRDWAVE はシリーズ名なし（ロゴを大きく表示）。右上は MC番号-SN番号
+
 ### 画像素材（pop_assets フォルダ）
 `pop_assets` に決まったファイル名で画像を置くと、POP の該当箇所がその画像になります（無いものは文字のロゴで表示）。
 例: `logo_galleria.png`（左上ロゴ）、`gpu_geforce.png`、`cpu_intel_core_ultra7.png`、`cpu_amd_ryzen.png`、`banner_credit.png`（下部バナー）。

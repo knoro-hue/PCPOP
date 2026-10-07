@@ -7,7 +7,8 @@
 
 ■ ヘッダーのロゴ（左上の紺色の枠ごと置き換え）
   logo_galleria       GALLERIA のロゴ
-  logo_thirdwave / logo_raytrek / logo_diginnos   （他ブランドの商品用）
+  logo_thirdwave      THIRDWAVE のロゴ（ノートPCなど。シリーズ名が無いので大きめに表示）
+  logo_raytrek / logo_diginnos   （他ブランドの商品用）
 
 ■ 基本構成の GPU ロゴ（上から順に探して、最初に見つかったものを使います）
   gpu_geforce_rtx5070  など型番入り（RTX の4桁）… その型番だけ専用にしたい時

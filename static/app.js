@@ -82,6 +82,9 @@ const ICON = {
   usbC: '<svg viewBox="0 0 40 24"><rect x="2" y="5" width="36" height="14" rx="7" fill="none" stroke="#222" stroke-width="2.4"/><rect x="10" y="10" width="20" height="4" rx="2" fill="#222"/></svg>',
   wifi: '<svg viewBox="0 0 24 24"><path d="M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="19.5" r="1.8" fill="#111"/></svg>',
   lan: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5" fill="none" stroke="#111" stroke-width="2"/><path d="M7 9h10v6h-2v2H9v-2H7z" fill="none" stroke="#111" stroke-width="1.6"/><path d="M9 9v2M11 9v2M13 9v2M15 9v2" stroke="#111" stroke-width="1.2"/></svg>',
+  hdmi: '<svg viewBox="0 0 24 24"><path d="M2 8h20v5l-3 3H5l-3-3z" fill="none" stroke="#111" stroke-width="2"/><path d="M6 11h12" stroke="#111" stroke-width="1.6"/></svg>',
+  usb: '<svg viewBox="0 0 24 24"><path d="M12 2v16M12 2l-2.5 3.5h5zM12 13l-5-3V7M12 15l5-3V9" fill="none" stroke="#111" stroke-width="1.8"/><circle cx="12" cy="19.5" r="2.2" fill="#111"/><rect x="5.5" y="5.5" width="3" height="2.5" fill="#111"/><circle cx="17" cy="8" r="1.6" fill="#111"/></svg>',
+  twSlash: '<svg viewBox="0 0 30 24"><path d="M6 22L12 2h4L10 22zM13 22L19 2h4l-6 20zM20 22L26 2h3l-6 20z" fill="#1b2350"/></svg>',
   emblem: '<svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z" fill="#c9a24a"/><path d="M12 6l4 2v4c0 2.6-1.7 4.6-4 5.6-2.3-1-4-3-4-5.6V8z" fill="#1b2350"/></svg>',
 };
 
@@ -198,36 +201,23 @@ function portsTable(s) {
 function render(d) {
   data = d;
   const s = d.sheet;
+  const note = s.note;  // ノートPCの時は画面・重量・用途などのノート用レイアウト
   buildFpsPanel(s);  // 表を作る前にゲームの選択欄を用意
   const pop = $("#pop");
-  pop.className = "pop sheet";
+  pop.className = "pop sheet" + (note ? " note" : "");
   pop.replaceChildren();
 
   // ヘッダー: ロゴ・シリーズ / Model Name・管理番号・型番
-  const head = el("div", { class: "s-head" },
+  const logoFile = asset("logo_" + s.brand.toLowerCase());
+  const head = el("div", { class: "s-head" + (s.series ? "" : " no-series") },
     el("div", { class: "s-brand" },
-      asset("logo_" + s.brand.toLowerCase()) ? assetImg(asset("logo_" + s.brand.toLowerCase()), "s-logo-img")
-        : el("div", { class: "s-logo" }, el("span", { class: "em", html: ICON.emblem }), ed("span", "t", s.brand)),
-      ed("div", "s-series", s.series)),
+      logoFile ? assetImg(logoFile, "s-logo-img") : textLogo(s.brand),
+      s.series ? ed("div", "s-series", s.series) : null),
     el("div", { class: "s-model" },
-      el("div", { class: "s-model-top" }, el("span", { text: "Model Name" }), ed("span", "mc", s.mc)),
+      el("div", { class: "s-model-top" }, el("span", { text: "Model Name" }), ed("span", "mc", note ? s.pid : s.mc)),
       ed("div", "s-code", s.code)));
 
-  // PC画像 + 基本構成
   const img = el("img", { id: "popImg", src: d.images[0] || "", alt: "" });
-  const basic = el("div", { class: "s-basic" }, el("div", { class: "bar", text: "基本構成" }));
-  for (const b of s.basic) {
-    const file = b.key === "GPU" ? gpuAsset(b.main) : b.key === "CPU" ? cpuAsset(b.main) : "";
-    const key = file ? assetImg(file, "logo-img")
-      : b.brand && LOGO[b.brand] ? LOGO[b.brand](b.main) : el("div", { class: "k", text: b.key });
-    const inline = b.key === "メモリ";
-    basic.append(el("div", { class: "row r-" + (b.brand ? "logo" : "text") }, el("div", { class: "kc" }, key),
-      el("div", { class: "vc" + (inline ? " inline" : "") }, ed("div", "m", b.main), b.sub ? ed("div", "s", b.sub) : null)));
-  }
-  const mid = el("div", { class: "s-mid" }, el("div", { class: "s-img" }, img), basic);
-
-  // ゲーム性能 + 端子
-  const tables = el("div", { class: "s-tables" }, gamesTable(d), portsTable(s));
 
   // 価格
   const inst = d.installment;
@@ -235,20 +225,6 @@ function render(d) {
     el("div", { class: "amt" }, ed("span", "n", yen(d.price)),
       el("span", { class: "unit" }, el("span", { class: "tax", text: "税込" }), el("span", { class: "en", text: "円" }))),
     inst ? ed("div", "inst opt-install", `三井住友分割払 ${inst.count || 36}回 月々${yen(inst.monthly)}円(税込)`) : null);
-
-  // 仕様
-  const sz = s.size || {};
-  const spec = el("div", { class: "s-spec opt-spec" }, el("div", { class: "bar", text: "仕様" }),
-    el("div", { class: "cells" },
-      el("div", { class: "c" }, el("div", { class: "ic" }, el("span", { html: ICON.wifi }), el("small", { text: "Wi-Fi" })),
-        el("div", { class: "tx" }, ed("div", "", s.wifi.main), ed("div", "", s.wifi.sub))),
-      el("div", { class: "c" }, el("div", { class: "ic" }, el("span", { html: ICON.lan }), el("small", { text: "LAN" })),
-        el("div", { class: "tx" }, ed("div", "", s.lan.main), ed("div", "", s.lan.sub))),
-      el("div", { class: "c size" }, vlbl("サイズ"),
-        el("div", { class: "wdh" }, ...["W", "D", "H"].map((k) =>
-          el("div", {}, el("span", { class: "k", text: k + ":" }), ed("span", "v", sz[k] || ""), el("span", { class: "u", text: "mm" }))))),
-      el("div", { class: "c weight" }, vlbl("重量"),
-        el("div", { class: "kg" }, el("span", { text: "約 " }), ed("b", "", s.weight), el("span", { text: " Kg" })))));
 
   const warranty = s.warranty ? ed("div", "s-warranty opt-warranty", `${s.warranty} （※別途オプション保証もご加入いただけます）`) : null;
 
@@ -262,13 +238,106 @@ function render(d) {
 
   const badge = s.badge ? ed("div", "s-badge opt-badge", s.badge) : null;
 
-  pop.append(head, mid, tables, price, spec, warranty, banner, badge);
+  const body = note ? noteBody(d, img) : deskBody(d, img);
+  pop.append(head, ...body.top, price, ...body.bottom, warranty, banner, badge);
   buildPanel(d);
   applyOptions();
   fitSheet();
   img.onload = fitSheet;
 }
 
+function textLogo(brand) {
+  if (/^THIRDWAVE$/i.test(brand)) {
+    return el("div", { class: "s-logo tw" }, el("span", { class: "em", html: ICON.twSlash }), ed("span", "t", "THIRDWAVE"));
+  }
+  return el("div", { class: "s-logo" }, el("span", { class: "em", html: ICON.emblem }), ed("span", "t", brand));
+}
+
+function specLogo(key, main, brand) {
+  const file = key === "GPU" ? gpuAsset(main) : key === "CPU" ? cpuAsset(main) : "";
+  if (file) return assetImg(file, "logo-img");
+  return brand && LOGO[brand] ? LOGO[brand](main) : el("div", { class: "k", text: key });
+}
+
+/* ---------- デスクトップ: PC画像 + 基本構成 / ゲーム性能 + 端子 / 仕様 */
+function deskBody(d, img) {
+  const s = d.sheet;
+  const basic = el("div", { class: "s-basic" }, el("div", { class: "bar", text: "基本構成" }));
+  for (const b of s.basic) {
+    const inline = b.key === "メモリ";
+    basic.append(el("div", { class: "row r-" + (b.brand ? "logo" : "text") }, el("div", { class: "kc" }, specLogo(b.key, b.main, b.brand)),
+      el("div", { class: "vc" + (inline ? " inline" : "") }, ed("div", "m", b.main), b.sub ? ed("div", "s", b.sub) : null)));
+  }
+  const mid = el("div", { class: "s-mid" }, el("div", { class: "s-img" }, img), basic);
+  const tables = el("div", { class: "s-tables" }, gamesTable(d), portsTable(s));
+
+  const sz = s.size || {};
+  const spec = el("div", { class: "s-spec opt-spec" }, el("div", { class: "bar", text: "仕様" }),
+    el("div", { class: "cells" },
+      iconCell("wifi", "Wi-Fi", s.wifi.main, s.wifi.sub),
+      iconCell("lan", "LAN", s.lan.main, s.lan.sub),
+      sizeCell(sz, ""),
+      el("div", { class: "c weight" }, vlbl("重量"),
+        el("div", { class: "kg" }, el("span", { text: "約 " }), ed("b", "", s.weight), el("span", { text: " Kg" })))));
+  return { top: [mid, tables], bottom: [spec] };
+}
+
+const iconCell = (icon, label, main, sub) => el("div", { class: "c" },
+  el("div", { class: "ic" }, el("span", { html: ICON[icon] }), el("small", { text: label })),
+  el("div", { class: "tx" }, ed("div", "", main), sub ? ed("div", "sub", sub) : null));
+const sizeCell = (sz, noteText) => el("div", { class: "c size" }, vlbl("サイズ"),
+  el("div", { class: "wdh" }, ...["W", "D", "H"].map((k) =>
+    el("div", {}, el("span", { class: "k", text: k + ":" }), ed("span", "v", sz[k] || ""), el("span", { class: "u", text: "mm" }))),
+    noteText ? ed("div", "gomu", noteText) : null));
+
+/* ---------- ノート: 重量・画面 / 画像 + 用途 or ゲーム性能 / CPU・GPU・メモリ・SSD・OS / インターフェース仕様 */
+const USE_LABEL = { office: "Office" };
+function usesTable(uses) {
+  const tb = el("table");
+  tb.append(el("tr", { class: "hd" }, el("th", { text: "主な用途" }), el("th", { text: "目安" })));
+  for (const [k, v] of Object.entries(uses)) {
+    tb.append(el("tr", {}, ed("th", "", USE_LABEL[k.toLowerCase()] || k), ed("td", "", v)));
+  }
+  return el("div", { class: "uses opt-games" }, tb, ed("div", "note", "◎＝文句なし　○＝余裕　△＝十分"));
+}
+
+function noteBody(d, img) {
+  const s = d.sheet, n = s.note;
+  const weight = el("div", { class: "n-weight" }, el("small", { text: "重量" }), el("small", { text: "約" }),
+    ed("b", "", n.weight), el("small", { text: "kg" }));
+  const disp = el("div", { class: "n-disp" },
+    el("div", { class: "l1" }, ed("span", "inch", n.inch),
+      el("span", { class: "u" }, el("span", { text: "インチ" }), ed("span", "", n.panel))),
+    el("div", { class: "l2" }, ed("span", "hz", n.hz), el("span", { class: "hzu", text: "Hz" }),
+      el("span", { class: "res" }, el("small", { text: "解像度" }), ed("span", "", n.res))));
+  const right = Object.keys(n.uses || {}).length ? usesTable(n.uses) : gamesTable(d);
+  const top = el("div", { class: "n-top" },
+    el("div", { class: "n-left" }, weight, el("div", { class: "s-img" }, img)),
+    el("div", { class: "n-right" }, disp, right));
+
+  const b = Object.fromEntries(s.basic.map((x) => [x.key, x]));
+  const line = (key, main, sub, brand) => el("div", { class: "n-row" },
+    el("div", { class: "lg" }, specLogo(key, main, brand)),
+    el("div", { class: "tx" }, ed("div", "m", main), sub ? ed("div", "s", sub) : null));
+  const ssdSub = (d.keySpecs.find((k) => k.label === "SSD")?.display.match(/\(([^)]*)\)\s*$/) || [])[1] || "";
+  const box = el("div", { class: "n-box" },
+    line("CPU", b.CPU.main, b.CPU.sub, b.CPU.brand),
+    line("GPU", n.gpu.main, n.gpu.sub, b.GPU.brand),
+    el("div", { class: "n-cols" },
+      el("div", {}, ed("div", "m", b["メモリ"].main), ed("div", "s", b["メモリ"].sub)),
+      el("div", {}, ed("div", "m", b.SSD.main), ed("div", "s", ssdSub)),
+      el("div", {}, ed("div", "m os", b.OS.main.replace(/\s+(\d+ビット)$/, "\n$1")))));
+
+  const io = el("div", { class: "s-spec n-if opt-spec" }, el("div", { class: "bar", text: "インターフェース仕様" }),
+    el("div", { class: "cells" },
+      iconCell("wifi", "Wi-Fi", n.wifi.main, n.wifi.sub),
+      iconCell("lan", "LAN", n.lan.main, n.lan.sub),
+      n.hdmi ? el("div", { class: "c" }, el("div", { class: "ic" }, el("span", { html: ICON.hdmi }), el("small", { text: "HDMI" }))) : null,
+      el("div", { class: "c" }, el("div", { class: "ic" }, el("span", { html: ICON.usb }), el("small", { text: "USB" })),
+        ed("div", "usb", n.usb.join("\n"))),
+      sizeCell(n.size || {}, n.sizeNote)));
+  return { top: [top, box], bottom: [io] };
+}
 // 型番・価格は枠の幅いっぱいに (長い型番は縮める)
 function fitText(node, maxMm, minMm) {
   if (!node) return;
@@ -284,6 +353,7 @@ function fitSheet() {
   fitText($(".s-price .n"), 38.8, 20);  // 110pt (PowerPoint の原稿と同じ)
   // 基本構成の値も1行に収める
   document.querySelectorAll(".s-basic .m").forEach((m) => fitText(m, 6.2, 3.6));
+  document.querySelectorAll(".n-row .m").forEach((m) => fitText(m, 6, 3.6));
 }
 // 型番・価格のフォント (Anton) は使う時に読み込まれるので、読み込み後に合わせ直す
 document.fonts?.addEventListener?.("loadingdone", () => data && fitSheet());

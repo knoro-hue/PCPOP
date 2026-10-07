@@ -138,3 +138,65 @@
 .s-basic .logo-img { max-width: 26mm; max-height: 15mm; object-fit: contain; display: block; }
 .s-banner.img { background: none; display: block; }
 .s-banner.img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* ---------- THIRDWAVE など シリーズ名の無いブランド: ロゴを大きく */
+.s-head.no-series .s-brand { align-self: center; }
+.s-logo.tw { background: none; color: #1b2350; padding: 0; }
+.s-logo.tw .em svg { width: 14mm; height: 11mm; }
+.s-logo.tw .t { font: bold 7mm/1 "Arial", sans-serif; font-style: normal; letter-spacing: .03em; }
+.s-head.no-series .s-logo-img { height: 20mm; }
+
+/* ---------- ノートPC */
+.note .n-top { display: flex; gap: 4mm; height: 80mm; margin-top: 3mm; flex-shrink: 0; }
+.note .n-left { width: 86mm; flex-shrink: 0; display: flex; flex-direction: column; }
+.note .n-weight {
+  align-self: flex-end; width: 25mm; height: 25mm; border-radius: 50%; background: #3f3f3f; color: #fff; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05;
+}
+.note .n-weight small { font-size: 3.2mm; }
+.note .n-weight b { font-family: var(--cond); font-stretch: condensed; font-size: 9mm; line-height: 1; }
+.note .n-left .s-img { flex: 1; min-height: 0; width: 100%; }
+.note .n-right { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.note .n-disp { font-family: var(--cond); font-stretch: condensed; }
+.note .n-disp .l1 { display: flex; align-items: flex-end; gap: 2mm; border-bottom: .4mm solid #111; padding-bottom: .5mm; }
+.note .n-disp .inch { font-size: 20mm; line-height: .9; }
+.note .n-disp .u { display: flex; flex-direction: column; font-family: "メイリオ", Meiryo, sans-serif; font-size: 6.6mm; line-height: 1.1; padding-bottom: 1mm; }
+.note .n-disp .l2 { display: flex; align-items: flex-end; gap: 1mm; margin-top: 1mm; }
+.note .n-disp .hz { font-size: 17mm; line-height: .9; }
+.note .n-disp .hzu { font-size: 9mm; line-height: 1; margin-right: 2mm; }
+.note .n-disp .res { display: flex; flex-direction: column; font-size: 7mm; line-height: 1; }
+.note .n-disp .res small { font-family: "メイリオ", Meiryo, sans-serif; font-size: 2.6mm; margin-bottom: .6mm; }
+.note .n-right .games, .note .n-right .uses { margin-top: 4mm; }
+.note .n-right .games table th, .note .n-right .games table td { font-size: 3mm; padding: .5mm 1.2mm; }
+.note .n-right .games .note { font-size: 2mm; }
+.note .uses { width: 72mm; align-self: center; }
+.note .uses table { border: .3mm solid #111; }
+.note .uses th, .note .uses td { font-size: 3mm; padding: .7mm 2mm; text-align: center; border-bottom: .2mm solid #fff; }
+.note .uses td { border-left: .2mm solid #999; }
+.note .uses tr.hd th { background: #8a8a8a; color: #fff; }
+.note .uses tr.hd th + th { border-left: .2mm solid #fff; }
+.note .uses tr:nth-child(even) th, .note .uses tr:nth-child(even) td { background: var(--blue-row); }
+.note .uses .note { font-size: 2.6mm; text-align: center; margin-top: .8mm; }
+
+/* CPU・GPU・メモリ・SSD・OS (濃いグレーの枠) */
+.note .n-box { background: #4a4a4a; color: #fff; border: .6mm solid #9a9a9a; margin: 3mm 0 0; flex-shrink: 0; }
+.note .n-row { display: flex; align-items: center; gap: 4mm; padding: 1.6mm 4mm 1.6mm 8mm; border-bottom: .3mm solid #888; min-height: 16mm; }
+.note .n-row .lg { width: 24mm; flex-shrink: 0; display: flex; justify-content: center; }
+.note .n-row .tx { min-width: 0; flex: 1; }
+.note .n-row .m { font-size: 6mm; line-height: 1.25; white-space: nowrap; overflow: hidden; }
+.note .n-row .s { font-size: 3mm; margin-top: .4mm; }
+.note .n-cols { display: flex; }
+.note .n-cols > div { flex: 1; text-align: center; padding: 1.6mm 1mm; border-left: .3mm solid #888; display: flex; flex-direction: column; justify-content: center; }
+.note .n-cols > div:first-child { border-left: 0; }
+.note .n-cols .m { font-size: 4.6mm; line-height: 1.2; white-space: pre-line; }
+.note .n-cols .s { font-size: 2.8mm; margin-top: .4mm; }
+
+/* インターフェース仕様 */
+.note .n-if .cells { justify-content: flex-start; }
+.note .n-if .c { padding: 0 2.5mm; }
+.note .n-if .tx { font-size: 2.7mm; }
+.note .n-if .tx .sub { font-size: 2.4mm; max-width: 20mm; }
+.note .n-if .usb { font-size: 2.8mm; white-space: pre-line; line-height: 1.4; }
+.note .n-if .size { margin-left: auto; }
+.note .gomu { font-size: 2.3mm; text-align: right; }
+.note .s-price { margin-top: 2mm; }

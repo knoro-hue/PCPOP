@@ -349,5 +349,41 @@ class TestFpsData(unittest.TestCase):
         self.assertEqual(d["sheet"]["fps"]["Valorant"]["最高"]["1080p/FHD"], "445 fps")
 
 
+class TestNoteSheet(unittest.TestCase):
+    """ノートPC (GALLERIA / THIRDWAVE) の個別POP用データ。"""
+
+    def load(self, name):
+        src = (Path(__file__).parent / "fixtures" / f"{name}.html").read_text(encoding="utf-8")
+        return scraper.parse_product(src, "x")["sheet"]
+
+    def test_galleria_note(self):
+        s = self.load("note_galleria")
+        self.assertEqual((s["series"], s["code"], s["pid"]), ("N-Series", "NPC7L-R56-G5", "MC25167-SN3526"))
+        n = s["note"]
+        self.assertEqual((n["inch"], n["panel"], n["hz"], n["res"], n["weight"]), ("15.3", "非光沢液晶", "165", "1920 x 1200", "1.9"))
+        self.assertEqual(n["wifi"], {"main": "6E 対応", "sub": "(ax/ac/a/b/g/n)"})
+        self.assertEqual(n["lan"], {"main": "1Gb", "sub": "対応LANポート"})
+        self.assertTrue(n["hdmi"])
+        self.assertEqual(n["usb"], ["3.2 Gen1 Type-A X 3", "3.2 Gen2 Type-C X 2"])
+        self.assertEqual((n["size"], n["sizeNote"]), ({"W": "342", "D": "254", "H": "30"}, "(ゴム足含む)"))
+        self.assertEqual(n["uses"], {})            # GALLERIA はゲーム性能の表
+        self.assertTrue(s["fps"])
+
+    def test_thirdwave_note(self):
+        s = self.load("note_thirdwave")
+        self.assertEqual((s["brand"], s["series"], s["code"]), ("THIRDWAVE", "", "DA5-C7HIGA-08S"))
+        cpu = next(b for b in s["basic"] if b["key"] == "CPU")
+        self.assertEqual(cpu["main"], "インテル Core Ultra 7 155H")
+        n = s["note"]
+        self.assertEqual((n["inch"], n["hz"], n["res"], n["weight"]), ("15.6", "60", "1920 x 1080", "1.7"))
+        self.assertEqual(n["gpu"], {"main": "インテル Arc グラフィックス", "sub": "(CPU内蔵)"})
+        self.assertEqual(n["wifi"]["main"], "7 対応")
+        # 用途の目安は data/ul_specdate.json から
+        self.assertEqual(n["uses"], {"動画視聴": "◎", "office": "◎", "動画編集": "◎", "クラウドAI": "◎", "ローカルAI": "◎"})
+
+    def test_desktop_is_not_note(self):
+        self.assertIsNone(scraper.parse_product(FIX.read_text(encoding="utf-8"), "x")["sheet"]["note"])
+
+
 if __name__ == "__main__":
     unittest.main()
