@@ -306,9 +306,10 @@ function noteBody(d, img) {
     ed("b", "", n.weight), el("small", { text: "kg" }));
   const disp = el("div", { class: "n-disp" },
     el("div", { class: "l1" }, ed("span", "inch", n.inch),
-      el("span", { class: "u" }, el("span", { text: "インチ" }), ed("span", "", n.panel))),
+      el("span", { class: "u" }, el("span", { class: "ui", text: "インチ" }), ed("span", "pnl", n.panel))),
     el("div", { class: "l2" }, ed("span", "hz", n.hz), el("span", { class: "hzu", text: "Hz" }),
-      el("span", { class: "res" }, el("small", { text: "解像度" }), ed("span", "", n.res))));
+      el("span", { class: "res" }, el("small", { text: "解像度" }), ed("span", "rv", n.res),
+        n.gamut ? ed("span", "gamut", n.gamut) : null)));  // 色域 (製品仕様にある時だけ)
   const right = Object.keys(n.uses || {}).length ? usesTable(n.uses) : gamesTable(d);
   const top = el("div", { class: "n-top" },
     el("div", { class: "n-left" }, weight, el("div", { class: "s-img" }, img)),

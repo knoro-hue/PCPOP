@@ -29,7 +29,8 @@ Windows ならエクスプローラーで `start.bat` をダブルクリック�
 
 ### ノートPC（GALLERIA ノート / THIRDWAVE ノート）
 スペックに液晶サイズ（インチ）がある商品はノート用のレイアウトになります。
-- 重量の丸・画面サイズ（インチ / 非光沢液晶）・リフレッシュレート（Hz）・解像度
+- 重量の丸・画面サイズ（インチ / 非光沢液晶）・リフレッシュレート（Hz）・解像度・色域（製品仕様にある時だけ。例: sRGB 100%）
+  （フォントは PowerPoint の原稿どおり: 数字＝Bahnschrift SemiBold、文字＝BIZ UDPゴシック）
 - 右の表: `data/ul_specdate.json` に MC番号があれば「主な用途 / 目安」（THIRDWAVE ノート）、無ければゲーム性能（GALLERIA ノート）
 - 濃いグレーの枠に CPU / GPU / メモリ / SSD / OS、下に「インターフェース仕様」（Wi-Fi・LAN・HDMI・USB の内訳・サイズ）
 - THIRDWAVE はシリーズ名なし（ロゴを大きく表示）。右上は MC番号-SN番号

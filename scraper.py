@@ -1084,6 +1084,18 @@ def fps_for(mc: str) -> dict:
     return (fps_data().get((mc or "").upper()) or {}).get("game_list") or {}
 
 
+def _gamut(t: dict, disp: str) -> str:
+    """ディスプレイの色域 (例: "sRGB 100%")。製品仕様に「色域」の項目か、液晶の説明に書いてある時だけ。"""
+    for k, v in t.items():
+        if "色域" in k and v and not re.search(r"無し|なし|-", v.strip()[:2]):
+            return v.translate(_ZEN).split("\n")[0].strip()
+    m = re.search(r"(?i)(sRGB|DCI-?P3|Adobe\s*RGB|NTSC)\s*(?:比|カバー率)?\s*(?:約)?\s*\d+(?:\.\d+)?\s*%", disp)
+    if m:
+        return m.group(0).strip()
+    m = re.search(r"色域[^0-9]{0,12}\d+(?:\.\d+)?\s*%", disp)
+    return m.group(0).strip() if m else ""
+
+
 def _note_info(t: dict, get, gpu_main: str, gpu_sub: str, mc: str) -> dict | None:
     """ノートPC用の項目。液晶のサイズ (インチ) がスペックにあればノートとみなす。"""
     disp = (get("ディスプレイ", "液晶パネル", "液晶", "モニタ") or "").translate(_ZEN)
@@ -1112,6 +1124,7 @@ def _note_info(t: dict, get, gpu_main: str, gpu_sub: str, mc: str) -> dict | Non
         "panel": "非光沢液晶" if "非光沢" in disp else ("光沢液晶" if "光沢" in disp else "液晶"),
         "hz": hz.group(1) if hz else "60",
         "res": f"{res.group(1)} x {res.group(2)}" if res else "",
+        "gamut": _gamut(t, disp),
         "weight": weight.group(1) if weight else "",
         "gpu": {"main": gpu_main, "sub": gpu_sub},
         "wifi": {"main": f"{wv.group(1)} 対応" if wv else ("非搭載" if re.search(r"無し|なし", wifi) or not wifi else "搭載"),

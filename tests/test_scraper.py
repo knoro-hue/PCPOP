@@ -360,6 +360,7 @@ class TestNoteSheet(unittest.TestCase):
         self.assertEqual((s["series"], s["code"], s["pid"]), ("N-Series", "NPC7L-R56-G5", "MC25167-SN3526"))
         n = s["note"]
         self.assertEqual((n["inch"], n["panel"], n["hz"], n["res"], n["weight"]), ("15.3", "非光沢液晶", "165", "1920 x 1200", "1.9"))
+        self.assertEqual(n["gamut"], "sRGB 100%")
         self.assertEqual(n["wifi"], {"main": "6E 対応", "sub": "(ax/ac/a/b/g/n)"})
         self.assertEqual(n["lan"], {"main": "1Gb", "sub": "対応LANポート"})
         self.assertTrue(n["hdmi"])
@@ -375,6 +376,7 @@ class TestNoteSheet(unittest.TestCase):
         self.assertEqual(cpu["main"], "インテル Core Ultra 7 155H")
         n = s["note"]
         self.assertEqual((n["inch"], n["hz"], n["res"], n["weight"]), ("15.6", "60", "1920 x 1080", "1.7"))
+        self.assertEqual(n["gamut"], "")  # 色域の記載なし
         self.assertEqual(n["gpu"], {"main": "インテル Arc グラフィックス", "sub": "(CPU内蔵)"})
         self.assertEqual(n["wifi"]["main"], "7 対応")
         # 用途の目安は data/ul_specdate.json から

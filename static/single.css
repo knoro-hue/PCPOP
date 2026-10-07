@@ -148,6 +148,7 @@
 .s-head.no-series .s-logo-img { height: 20mm; }
 
 /* ---------- ノートPC */
+.note { --bahn-sb: "Bahnschrift SemiBold", "Bahnschrift", "Anton", sans-serif; }
 .note .n-top { display: flex; gap: 4mm; height: 80mm; margin-top: 3mm; flex-shrink: 0; }
 .note .n-left { width: 86mm; flex-shrink: 0; display: flex; flex-direction: column; }
 .note .n-weight {
@@ -155,18 +156,23 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05;
 }
 .note .n-weight small { font-size: 3.2mm; }
-.note .n-weight b { font-family: var(--cond); font-stretch: condensed; font-size: 9mm; line-height: 1; }
+.note .n-weight b { font-family: var(--bahn-sb); font-weight: 600; font-size: 14.08mm; line-height: .95; }  /* 39.9pt */
 .note .n-left .s-img { flex: 1; min-height: 0; width: 100%; }
 .note .n-right { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.note .n-disp { font-family: var(--cond); font-stretch: condensed; }
+/* 画面 (PowerPoint の原稿の pt を mm に換算: 1pt = 0.3528mm) */
+.note .n-disp { --bahn-sb: "Bahnschrift SemiBold", "Bahnschrift", "Anton", sans-serif; --biz: "BIZ UDPGothic", "BIZ UDPゴシック", "メイリオ", Meiryo, sans-serif; }
 .note .n-disp .l1 { display: flex; align-items: flex-end; gap: 2mm; border-bottom: .4mm solid #111; padding-bottom: .5mm; }
-.note .n-disp .inch { font-size: 20mm; line-height: .9; }
-.note .n-disp .u { display: flex; flex-direction: column; font-family: "メイリオ", Meiryo, sans-serif; font-size: 6.6mm; line-height: 1.1; padding-bottom: 1mm; }
+.note .n-disp .inch { font-family: var(--bahn-sb); font-weight: 600; font-size: 22.4mm; line-height: .85; }   /* 63.5pt */
+.note .n-disp .u { display: flex; flex-direction: column; font-family: var(--biz); font-weight: bold; line-height: 1.05; padding-bottom: .8mm; }
+.note .n-disp .u .ui { font-size: 8.96mm; }      /* 25.4pt */
+.note .n-disp .u .pnl { font-size: 7.69mm; }   /* 21.8pt */
 .note .n-disp .l2 { display: flex; align-items: flex-end; gap: 1mm; margin-top: 1mm; }
-.note .n-disp .hz { font-size: 17mm; line-height: .9; }
-.note .n-disp .hzu { font-size: 9mm; line-height: 1; margin-right: 2mm; }
-.note .n-disp .res { display: flex; flex-direction: column; font-size: 7mm; line-height: 1; }
-.note .n-disp .res small { font-family: "メイリオ", Meiryo, sans-serif; font-size: 2.6mm; margin-bottom: .6mm; }
+.note .n-disp .hz { font-family: var(--bahn-sb); font-weight: 700; font-size: 19.19mm; line-height: .85; }   /* 54.4pt 太字 */
+.note .n-disp .hzu { font-family: var(--bahn-sb); font-weight: 700; font-size: 12.81mm; line-height: .9; margin-right: 2mm; }  /* 36.3pt 太字 */
+.note .n-disp .res { display: flex; flex-direction: column; font-family: var(--biz); line-height: 1.05; }
+.note .n-disp .res small { font-size: 3.35mm; font-weight: normal; margin-bottom: .4mm; }   /* 9.5pt */
+.note .n-disp .res .rv { font-size: 6.39mm; font-weight: bold; }    /* 18.1pt 太字 */
+.note .n-disp .res .gamut { font-size: 3mm; font-weight: bold; margin-top: .4mm; }  /* 8.5pt 太字 */
 .note .n-right .games, .note .n-right .uses { margin-top: 4mm; }
 .note .n-right .games table th, .note .n-right .games table td { font-size: 3mm; padding: .5mm 1.2mm; }
 .note .n-right .games .note { font-size: 2mm; }
