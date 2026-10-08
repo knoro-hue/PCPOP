@@ -46,6 +46,8 @@
 .s-basic .m { font-weight: 900; font-size: 6.2mm; line-height: 1.25; white-space: nowrap; overflow: hidden; }
 .s-basic .s { font-weight: bold; font-size: 3.4mm; margin-top: .6mm; white-space: nowrap; }
 .s-basic .vc.inline .s { margin: 0; white-space: normal; }
+.s-basic .vc.inline .x { flex-basis: 100%; font-weight: bold; font-size: 3mm; line-height: 1.25; }
+.s-basic .vc { overflow: hidden; }
 
 /* GPU / CPU のロゴ風バッジ */
 .logo { width: 22mm; height: 13mm; display: flex; flex-direction: column; justify-content: center; padding: 0 2mm; line-height: 1.05; border-radius: .6mm; }

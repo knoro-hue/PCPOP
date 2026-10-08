@@ -270,7 +270,8 @@ function deskBody(d, img) {
   for (const b of s.basic) {
     const inline = b.key === "メモリ" || b.key === "SSD";
     basic.append(el("div", { class: "row r-" + (b.brand ? "logo" : "text") }, el("div", { class: "kc" }, specLogo(b.key, b.main, b.brand)),
-      el("div", { class: "vc" + (inline ? " inline" : "") }, ed("div", "m", b.main), b.sub ? ed("div", "s", b.sub) : null)));
+      el("div", { class: "vc" + (inline ? " inline" : "") }, ed("div", "m", b.main), b.sub ? ed("div", "s", b.sub) : null,
+        b.extra ? ed("div", "x", b.extra) : null)));  // メモリの「+ ヒートシンク」などは2行目に
   }
   const mid = el("div", { class: "s-mid" }, el("div", { class: "s-img" }, img), basic);
   const tables = el("div", { class: "s-tables" }, gamesTable(d), portsTable(s));
@@ -329,7 +330,7 @@ function noteBody(d, img) {
     line("CPU", b.CPU.main, b.CPU.sub, b.CPU.brand),
     line("GPU", n.gpu.main, n.gpu.sub, b.GPU.brand),
     el("div", { class: "n-cols" },
-      el("div", {}, ed("div", "m", b["メモリ"].main), ed("div", "s", b["メモリ"].sub)),
+      el("div", {}, ed("div", "m", b["メモリ"].main), ed("div", "s", b["メモリ"].sub), b["メモリ"].extra ? ed("div", "s", b["メモリ"].extra) : null),
       el("div", {}, ed("div", "m", b.SSD.main), ed("div", "s", ssdSub)),
       el("div", {}, ed("div", "m os", b.OS.main.replace(/\s+(\d+ビット)$/, "\n$1")))));
 
@@ -359,6 +360,19 @@ function fitSheet() {
   // 基本構成の値も1行に収める
   document.querySelectorAll(".s-basic .m").forEach((m) => fitText(m, 6.2, 3.6));
   document.querySelectorAll(".n-row .m").forEach((m) => fitText(m, 6, 3.6));
+  // 基本構成の行に収まらない時は補足 (かっこ内・+ 付属品) の文字を小さく
+  document.querySelectorAll(".s-basic .vc, .n-cols > div").forEach(fitHeight);
+}
+
+function fitHeight(box) {
+  const subs = [...box.querySelectorAll(".s, .x")];
+  if (!subs.length) return;
+  subs.forEach((x) => (x.style.fontSize = ""));
+  let mm = parseFloat(getComputedStyle(subs[0]).fontSize) / 3.7795;
+  while (mm > 2 && box.scrollHeight > box.clientHeight + 1) {
+    mm -= 0.2;
+    subs.forEach((x) => (x.style.fontSize = mm.toFixed(1) + "mm"));
+  }
 }
 
 // 中身が A4 に入りきらない時 (カスタマイズ内容の枠が大きい等) は、画像・表・価格を少しずつ小さくして重ならないようにする
@@ -426,9 +440,12 @@ $("#btnGamesMark").onclick = () => setGames("mark");
 const SPEC_CUSTOM = ["メモリ", "SSD"];
 const CUSTOM_LABEL = { "オフィスソフト": "Office" };
 
-function splitMemory(t) {  // "32GB (16GB×2) (DDR5-4800)" → ["32GB", "(16GB×2) (DDR5-4800)"]
-  const m = t.match(/^(\S+)\s*(.*)$/);
-  return m ? [m[1], m[2]] : [t, ""];
+// "64GB (32GB×2) (DDR5-4800) + ホワイトヒートシンク(ARGB…)" → ["64GB", "(32GB×2) (DDR5-4800)", "+ ホワイトヒートシンク(ARGB…)"]
+function splitMemory(t) {
+  const [body, ...plus] = t.split(/\s*\+\s*/);
+  const m = body.match(/^(\S+)\s*(.*)$/);
+  const extra = plus.length ? "+ " + plus.join(" + ") : "";
+  return m ? [m[1], m[2], extra] : [body, "", extra];
 }
 function splitSsd(t) {     // "2TB SSD (M.2 NVMe Gen4) WD SN850X (読込速度 …)" → ["2TB SSD", "M.2 NVMe Gen4 WD SN850X"]
   const s = t.replace(/\s*\((?:読込|読み込み)速度[^)]*\)/, "").trim();
@@ -453,7 +470,7 @@ function applyCustom(orig) {
   }
   const b = Object.fromEntries(d.sheet.basic.map((x) => [x.key, x]));
   for (const { cat, opt } of picks) {
-    if (cat === "メモリ") [b["メモリ"].main, b["メモリ"].sub] = splitMemory(opt.pop);
+    if (cat === "メモリ") [b["メモリ"].main, b["メモリ"].sub, b["メモリ"].extra] = splitMemory(opt.pop);
     if (cat === "SSD") {
       [b.SSD.main, b.SSD.detail] = splitSsd(opt.pop);
       b.SSD.sub = b.SSD.detail;
