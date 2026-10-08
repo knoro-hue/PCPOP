@@ -34,7 +34,16 @@
       <label><input type="checkbox" id="optInstall" checked> 三井住友分割払（月々）</label>
       <label><input type="checkbox" id="optSpec" checked> 仕様（Wi-Fi・LAN・サイズ・重量）</label>
       <label><input type="checkbox" id="optWarranty" checked> 持込修理保証</label>
-      <label><input type="checkbox" id="optBanner" checked> 分割手数料0円バナー</label>
+      <label><input type="checkbox" id="optBanner" checked> 下部バナー / カスタマイズ内容</label>
+    </section>
+
+    <section>
+      <h2>下部バナー</h2>
+      <div id="bannerSel"></div>
+      <label class="lbl" style="margin-top:6px">別の画像を使う（このPOPだけ）<input type="file" id="bannerFile" accept="image/*"></label>
+      <p class="hint">画像サイズ: <b>2232 × 408 px</b>（186 × 34 mm・約300dpi、横:縦 ≒ 5.5:1）。
+        pop_assets フォルダに banner_credit / banner_campaign / banner_warranty / banner_service（.png / .jpg）の名前で置くと選べます。
+        カスタマイズした時は、この枠に「カスタマイズ内容」が入ります。</p>
     </section>
 
     <section id="customBox" hidden>

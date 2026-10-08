@@ -234,13 +234,8 @@ function render(d) {
 
   const warranty = s.warranty ? ed("div", "s-warranty opt-warranty", `${s.warranty} （※別途オプション保証もご加入いただけます）`) : null;
 
-  // 分割手数料0円バナー
-  const bannerFile = asset("banner_credit");
-  const banner = d.customBox?.length ? customBox(d.customBox) : bannerFile ? el("div", { class: "s-banner img opt-banner" }, assetImg(bannerFile, "")) : el("div", { class: "s-banner opt-banner" },
-    el("div", { class: "card" }, ed("b", "", "三井住友カード"), ed("span", "", "ショッピングクレジット")),
-    el("div", { class: "msg" },
-      el("div", { class: "max" }, el("span", { class: "flag", text: "最大" }), ed("b", "", String(inst?.count || 36)), el("span", { text: "回まで" })),
-      el("div", { class: "zero" }, el("span", { text: "分割手数料" }), el("b", { text: "0" }), el("span", { text: "円!!" }))));
+  // 下部: カスタマイズ内容 (カスタマイズした時) か、選んだバナー
+  const banner = d.customBox?.length ? customBox(d.customBox) : bannerEl(inst);
 
 
   const body = note ? noteBody(d, img) : deskBody(d, img);
@@ -250,6 +245,50 @@ function render(d) {
   fitSheet();
   img.onload = fitSheet;
 }
+
+/* ---------- 下部バナー (分割手数料0円 / キャンペーン / 保証 / サービス を選べる) */
+// 画像は pop_assets に置く: banner_credit / banner_campaign / banner_warranty / banner_service (.png/.jpg)
+// 枠の大きさは 186 × 34 mm (カスタマイズ内容を全部入れた時の枠と同じ)
+const BANNERS = [
+  { id: "credit", label: "分割手数料0円（三井住友カード）", file: "banner_credit" },
+  { id: "campaign", label: "キャンペーン", file: "banner_campaign" },
+  { id: "warranty", label: "保証", file: "banner_warranty" },
+  { id: "service", label: "サービス", file: "banner_service" },
+];
+let bannerSel = "credit";
+let bannerUpload = "";  // 「画像を選ぶ」で選んだ画像 (このPOPだけで使う)
+
+function bannerEl(inst) {
+  const b = BANNERS.find((x) => x.id === bannerSel) || BANNERS[0];
+  const file = bannerUpload || asset(b.file);
+  if (file) return el("div", { class: "s-banner img opt-banner" }, assetImg(file, ""));
+  if (b.id === "credit") {  // 画像が無い時は文字で作った分割手数料0円バナー
+    return el("div", { class: "s-banner opt-banner" },
+      el("div", { class: "card" }, ed("b", "", "三井住友カード"), ed("span", "", "ショッピングクレジット")),
+      el("div", { class: "msg" },
+        el("div", { class: "max" }, el("span", { class: "flag", text: "最大" }), ed("b", "", String(inst?.count || 36)), el("span", { text: "回まで" })),
+        el("div", { class: "zero" }, el("span", { text: "分割手数料" }), el("b", { text: "0" }), el("span", { text: "円!!" }))));
+  }
+  return el("div", { class: "s-banner empty opt-banner" },
+    el("div", { text: `${b.label}バナー：pop_assets フォルダに ${b.file}.png を置いてください（186 × 34 mm）` }));
+}
+
+function buildBannerPanel() {
+  const box = $("#bannerSel");
+  box.replaceChildren(...BANNERS.map((b) => {
+    const r = el("input", { type: "radio", name: "banner", value: b.id });
+    r.checked = b.id === bannerSel;
+    r.onchange = () => { bannerSel = b.id; bannerUpload = ""; $("#bannerFile").value = ""; rerender(); };
+    const has = asset(b.file) ? "" : (b.id === "credit" ? "（画像なし：文字のバナー）" : "（画像なし）");
+    return el("label", {}, r, ` ${b.label}`, el("small", { class: "hint", text: has }));
+  }));
+}
+$("#bannerFile").onchange = (e) => {
+  const f = e.target.files[0];
+  if (f) { bannerUpload = URL.createObjectURL(f); rerender(); }
+};
+function rerender() { if (base) render(applyCustom(base)); }
+assetsReady.then(buildBannerPanel);
 
 function textLogo(brand) {
   if (/^THIRDWAVE$/i.test(brand)) {
@@ -365,6 +404,17 @@ function fitSheet() {
   document.querySelectorAll(".n-row .m").forEach((m) => fitText(m, 6, 3.6));
   // 基本構成の行に収まらない時は補足 (かっこ内・+ 付属品) の文字を小さく
   document.querySelectorAll(".s-basic .vc, .n-cols > div").forEach(fitHeight);
+  // カスタマイズ内容: 枠 (34mm) に入るまで文字を小さく
+  const cb = $(".s-custom");
+  if (cb) {
+    const vs = [...cb.querySelectorAll(".v")];
+    vs.forEach((v) => (v.style.fontSize = ""));
+    let mm = vs.length ? parseFloat(getComputedStyle(vs[0]).fontSize) / 3.7795 : 0;
+    while (mm > 2 && cb.scrollHeight > cb.clientHeight + 1) {
+      mm -= 0.1;
+      vs.forEach((v) => (v.style.fontSize = mm.toFixed(1) + "mm"));
+    }
+  }
 }
 
 function fitHeight(box) {

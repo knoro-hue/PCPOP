@@ -44,7 +44,8 @@ Windows ならエクスプローラーで `start.bat` をダブルクリック�
 
 ### 画像素材（pop_assets フォルダ）
 `pop_assets` に決まったファイル名で画像を置くと、POP の該当箇所がその画像になります（無いものは文字のロゴで表示）。
-例: `logo_galleria.png`（左上ロゴ）、`gpu_geforce.png`、`cpu_intel_core_ultra7.png`、`cpu_amd_ryzen.png`、`banner_credit.png`（下部バナー）。
+例: `logo_galleria.png`（左上ロゴ）、`gpu_geforce.png`、`cpu_intel_core_ultra7.png`、`cpu_amd_ryzen.png`。
+下部バナーは `banner_credit` / `banner_campaign` / `banner_warranty` / `banner_service` の4つを左パネルで選択（画像は **2232 × 408 px**＝186 × 34 mm）。
 ファイル名の一覧は `pop_assets/README.txt`。
 
 ### ゲーム性能（data フォルダ）

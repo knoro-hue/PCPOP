@@ -3,6 +3,8 @@
 @font-face { font-family: "Poppins"; src: url("fonts/poppins-latin-800-italic.woff2") format("woff2"); font-weight: 800; font-style: italic; font-display: block; }
 
 .pop.sheet {
+  /* 下部バナー・カスタマイズ内容の枠: 186 × 34 mm (カスタマイズを全部入れた時の大きさ) */
+  --slot-h: 34mm;
   --red: #e60012; --ink: #111; --gray: #8a8a8a; --blue-row: #dbe8f7;
   padding: 5mm 7mm 4mm; color: var(--ink);
   /* 文字は基本 メイリオ 太字 */
@@ -122,18 +124,18 @@
 
 /* 分割手数料0円バナー */
 .s-banner {
-  flex-shrink: 0; display: flex; align-items: stretch; height: 24mm; margin: 1.5mm 5mm 0;
+  flex-shrink: 0; display: flex; align-items: stretch; height: var(--slot-h); margin: 1.5mm 5mm 0;
   background: linear-gradient(100deg, #0a8f5a 0%, #12a46b 38%, #1b3c8c 38.2%, #2453b8 100%); color: #fff;
 }
 .s-banner .card { width: 62mm; margin: 3mm; background: #fff; color: #0a6e45; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-.s-banner .card b { font-size: 6.2mm; line-height: 1.2; }
-.s-banner .card span { font-size: 4mm; font-weight: bold; }
+.s-banner .card b { font-size: 7.4mm; line-height: 1.2; }
+.s-banner .card span { font-size: 4.8mm; font-weight: bold; }
 .s-banner .msg { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1mm; }
-.s-banner .max { background: #fff; color: #1b3c8c; font-weight: 900; font-size: 4.6mm; padding: .4mm 3mm; border-radius: 1mm; }
+.s-banner .max { background: #fff; color: #1b3c8c; font-weight: 900; font-size: 5.6mm; padding: .4mm 3mm; border-radius: 1mm; }
 .s-banner .max .flag { background: #ffd400; color: #111; padding: 0 1.2mm; margin-right: 1mm; }
 .s-banner .max b { font-size: 6mm; color: #e60012; }
-.s-banner .zero { font-weight: 900; font-size: 7mm; }
-.s-banner .zero b { font-size: 11mm; color: #ffd400; margin: 0 .5mm; }
+.s-banner .zero { font-weight: 900; font-size: 8.6mm; }
+.s-banner .zero b { font-size: 13.5mm; color: #ffd400; margin: 0 .5mm; }
 
 
 /* pop_assets フォルダの画像を使う時 */
@@ -213,7 +215,8 @@
 .note .s-price { margin-top: 2mm; }
 
 /* ---------- カスタマイズ内容 (下のバナーの代わり) */
-.s-custom { flex-shrink: 0; margin: 1.5mm 5mm 0; border: .5mm solid #111; }
+.s-custom { flex-shrink: 0; margin: 1.5mm 5mm 0; border: .5mm solid #111; height: var(--slot-h); display: flex; flex-direction: column; overflow: hidden; }
+.s-custom .items { flex: 1; min-height: 0; align-content: stretch; }
 .s-custom .bar { background: var(--red); font-size: 3.4mm; padding: .8mm 0; }
 .s-custom .items { display: grid; grid-template-columns: 1fr; }
 .s-custom.two .items { grid-template-columns: 1fr 1fr; }
@@ -227,3 +230,6 @@
 /* 型番の後ろの説明 (例: Ryzen 7 9800X3D搭載 カグラナナ コラボモデル) */
 .s-code-sub { font-size: 3.6mm; line-height: 1.2; text-align: right; white-space: nowrap; overflow: hidden; margin: -.5mm 0 .4mm; }
 .s-model:has(.s-code-sub) .s-code { line-height: 1.05; }
+
+.s-banner.empty { background: #f4f4f4; color: #777; border: .5mm dashed #aaa; align-items: center; justify-content: center; font-size: 3.4mm; text-align: center; padding: 0 6mm; }
+@media print { .s-banner.empty { display: none; } }
