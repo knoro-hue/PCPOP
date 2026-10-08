@@ -268,7 +268,7 @@ function deskBody(d, img) {
   const s = d.sheet;
   const basic = el("div", { class: "s-basic" }, el("div", { class: "bar", text: "基本構成" }));
   for (const b of s.basic) {
-    const inline = b.key === "メモリ";
+    const inline = b.key === "メモリ" || b.key === "SSD";
     basic.append(el("div", { class: "row r-" + (b.brand ? "logo" : "text") }, el("div", { class: "kc" }, specLogo(b.key, b.main, b.brand)),
       el("div", { class: "vc" + (inline ? " inline" : "") }, ed("div", "m", b.main), b.sub ? ed("div", "s", b.sub) : null)));
   }
@@ -354,11 +354,26 @@ function fitText(node, maxMm, minMm) {
   }
 }
 function fitSheet() {
+  fitLayout();
   fitText($(".s-code"), 24, 9);
-  fitText($(".s-price .n"), 38.8, 20);  // 110pt (PowerPoint の原稿と同じ)
   // 基本構成の値も1行に収める
   document.querySelectorAll(".s-basic .m").forEach((m) => fitText(m, 6.2, 3.6));
   document.querySelectorAll(".n-row .m").forEach((m) => fitText(m, 6, 3.6));
+}
+
+// 中身が A4 に入りきらない時 (カスタマイズ内容の枠が大きい等) は、画像・表・価格を少しずつ小さくして重ならないようにする
+function fitLayout() {
+  const pop = $("#pop.sheet");
+  if (!pop) return;
+  const tables = pop.querySelector(".s-tables");
+  const price = pop.querySelector(".s-price .n");
+  const fits = () => pop.scrollHeight <= pop.clientHeight + 1 &&
+    (!tables || [...tables.children].every((c) => c.hidden || c.getBoundingClientRect().bottom <= tables.getBoundingClientRect().bottom + 1));
+  for (let k = 1; k >= 0.7; k -= 0.03) {
+    pop.style.setProperty("--k", k.toFixed(2));
+    fitText(price, 38.8 * Math.max(k, 0.82), 20);  // 価格は 110pt から最大 2割まで
+    if (fits()) return;
+  }
 }
 // 型番・価格のフォント (Anton) は使う時に読み込まれるので、読み込み後に合わせ直す
 document.fonts?.addEventListener?.("loadingdone", () => data && fitSheet());

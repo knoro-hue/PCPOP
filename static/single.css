@@ -30,7 +30,8 @@
 .s-code { font-family: var(--cond); font-weight: bold; font-stretch: condensed; font-size: 24mm; line-height: 1.15; white-space: nowrap; overflow: hidden; text-align: right; }
 
 /* PC画像 + 基本構成 */
-.s-mid { display: flex; gap: 5mm; height: 84mm; margin-top: 4mm; flex-shrink: 0; }
+/* --k: 中身が多い時 (カスタマイズ内容の枠など) に全体を少しずつ詰める倍率 (app.js の fitLayout) */
+.s-mid { display: flex; gap: 5mm; height: calc(84mm * var(--k, 1)); margin-top: calc(4mm * var(--k, 1)); flex-shrink: 0; }
 .s-img { width: 52mm; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .s-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .s-basic { flex: 1; min-width: 0; border: .5mm solid #111; display: flex; flex-direction: column; }
@@ -40,10 +41,11 @@
 .s-basic .kc { width: 30mm; flex-shrink: 0; border-right: .4mm solid #111; display: flex; align-items: center; justify-content: center; }
 .s-basic .kc .k { font-size: 5.4mm; }
 .s-basic .vc { flex: 1; min-width: 0; padding: 0 3mm; display: flex; flex-direction: column; justify-content: center; }
-.s-basic .vc.inline { flex-direction: row; justify-content: flex-start; align-items: center; gap: 3mm; }
+/* メモリ・SSD: 横並び。枠に入らない時だけ補足を次の行へ */
+.s-basic .vc.inline { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: baseline; align-content: center; column-gap: 3mm; row-gap: 0; }
 .s-basic .m { font-weight: 900; font-size: 6.2mm; line-height: 1.25; white-space: nowrap; overflow: hidden; }
 .s-basic .s { font-weight: bold; font-size: 3.4mm; margin-top: .6mm; white-space: nowrap; }
-.s-basic .vc.inline .s { margin: 0; }
+.s-basic .vc.inline .s { margin: 0; white-space: normal; }
 
 /* GPU / CPU のロゴ風バッジ */
 .logo { width: 22mm; height: 13mm; display: flex; flex-direction: column; justify-content: center; padding: 0 2mm; line-height: 1.05; border-radius: .6mm; }
@@ -58,11 +60,11 @@
 .logo.amd b { color: #f26522; }
 
 /* ゲーム性能 / 端子形状 */
-.s-tables { display: flex; gap: 3mm; margin-top: 4mm; align-items: flex-start; flex: 1; min-height: 0; }
+.s-tables { display: flex; gap: 3mm; margin-top: calc(4mm * var(--k, 1)); align-items: flex-start; flex: 1; min-height: 0; }
 .sheet table { border-collapse: collapse; width: 100%; }
 .games { flex: 1.5; min-width: 0; }
 .games table th:first-child { width: 52%; }
-.games table th, .games table td { border-bottom: .3mm solid #fff; font-size: 3.6mm; padding: .9mm 1.5mm; text-align: center; }
+.games table th, .games table td { border-bottom: .3mm solid #fff; font-size: calc(3.6mm * var(--k, 1)); padding: calc(.9mm * var(--k, 1)) 1.5mm; text-align: center; }
 .games table tr:nth-child(even) { background: #eee; }
 .games table tr.hd th { background: #8a8a8a; color: #fff; font-size: 3.4mm; }
 .games table th { font-weight: bold; text-align: center; }
@@ -72,7 +74,7 @@
 .games table tr.hd th + th { border-left-color: #fff; }
 .games .note { font-size: 2.3mm; color: #333; white-space: pre-line; margin-top: .8mm; line-height: 1.35; }
 .ports { flex: 1; min-width: 0; border: .4mm solid #111; }
-.ports th, .ports td { font-size: 2.4mm; padding: .35mm 1mm; border-bottom: .2mm solid #ccc; }
+.ports th, .ports td { font-size: calc(2.4mm * var(--k, 1)); padding: calc(.35mm * var(--k, 1)) 1mm; border-bottom: .2mm solid #ccc; }
 .ports tr.hd th { background: #111; color: #fff; font-size: 2.5mm; }
 .ports td.ic { width: 13mm; border-right: .3mm solid #111; border-bottom: .3mm solid #111; text-align: center; background: #fff; }
 .ports td.ic svg { width: 9mm; display: block; margin: 0 auto; }
@@ -84,7 +86,7 @@
 .ports tr.hd th + th { border-left: .2mm solid #fff; }
 
 /* 価格 */
-.s-price { flex-shrink: 0; text-align: center; margin-top: 3mm; }
+.s-price { flex-shrink: 0; text-align: center; margin-top: calc(3mm * var(--k, 1)); }
 .s-price .amt { display: flex; justify-content: center; align-items: flex-end; color: var(--red); line-height: .95; }
 .s-price .n {
   font-family: var(--impact); font-weight: bold; font-size: 38.8mm; line-height: 1.08; letter-spacing: .06em; white-space: nowrap; max-width: 160mm; overflow: hidden;
@@ -149,7 +151,7 @@
 
 /* ---------- ノートPC */
 .note { --bahn-sb: "Bahnschrift SemiBold", "Bahnschrift", "Anton", sans-serif; }
-.note .n-top { display: flex; gap: 4mm; height: 80mm; margin-top: 3mm; flex-shrink: 0; }
+.note .n-top { display: flex; gap: 4mm; height: calc(80mm * var(--k, 1)); margin-top: 3mm; flex-shrink: 0; }
 .note .n-left { width: 86mm; flex-shrink: 0; display: flex; flex-direction: column; }
 .note .n-weight {
   align-self: flex-end; width: 25mm; height: 25mm; border-radius: 50%; background: #3f3f3f; color: #fff; flex-shrink: 0;
