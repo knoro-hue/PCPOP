@@ -158,3 +158,6 @@ table.raw td { white-space: pre-wrap; }
 .inline-checks label { display: inline !important; margin-right: 8px; }
 .fps-games { display: grid; grid-template-columns: 1fr 1fr; font-size: 12px; }
 .fps-games label { font-size: 12px !important; margin: 2px 0 !important; }
+.cust { display: block; margin: 6px 0 !important; }
+.cust .lbl { display: block; font-size: 12px; }
+.cust select { width: 100%; font-size: 12px; padding: 4px; }

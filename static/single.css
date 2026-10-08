@@ -207,3 +207,15 @@
 .note .n-if .size { margin-left: auto; }
 .note .gomu { font-size: 2.3mm; text-align: right; }
 .note .s-price { margin-top: 2mm; }
+
+/* ---------- カスタマイズ内容 (下のバナーの代わり) */
+.s-custom { flex-shrink: 0; margin: 1.5mm 5mm 0; border: .5mm solid #111; }
+.s-custom .bar { background: var(--red); font-size: 3.4mm; padding: .8mm 0; }
+.s-custom .items { display: grid; grid-template-columns: 1fr; }
+.s-custom.two .items { grid-template-columns: 1fr 1fr; }
+.s-custom .it { display: flex; align-items: center; border-top: .3mm solid #bbb; min-height: 6.4mm; }
+.s-custom .it:first-child, .s-custom.two .it:nth-child(2) { border-top: 0; }
+.s-custom.two .it:nth-child(even) { border-left: .3mm solid #bbb; }
+.s-custom .k { width: 20mm; flex-shrink: 0; align-self: stretch; display: flex; align-items: center; justify-content: center; background: #eee; font-size: 3mm; }
+.s-custom .v { flex: 1; min-width: 0; padding: .6mm 2mm; font-size: 3.3mm; line-height: 1.3; }
+.s-custom.two .v { font-size: 2.8mm; }

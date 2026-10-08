@@ -928,6 +928,7 @@ def parse_product(src: str, url: str = "") -> dict:
         "warnings": _warnings(pj, table, price),
     }
     out["sheet"] = pop_sheet(out, src)
+    out["customize"] = parse_customize(src)
     return out
 
 
@@ -1159,7 +1160,8 @@ def pop_sheet(d: dict, src: str = "") -> dict:
     mm = re.match(r"^(\S+)\s*(.*)$", mem_main)
     if mm and mm.group(2):
         mem_main, mem_sub = mm.group(1), (mm.group(2) + " " + mem_sub).strip()
-    ssd_main, _ = _paren_split(get("SSD"))
+    ssd_main, ssd_detail = _paren_split(get("SSD"))
+    ssd_detail = ssd_detail.strip("()")
     os_main, _ = _paren_split(get("OS"))
 
     def brand_of(v: str) -> str:
@@ -1195,7 +1197,7 @@ def pop_sheet(d: dict, src: str = "") -> dict:
             {"key": "GPU", "brand": brand_of(gpu_main), "main": gpu_main, "sub": gpu_sub},
             {"key": "CPU", "brand": brand_of(cpu_main), "main": cpu_main, "sub": cpu_sub},
             {"key": "メモリ", "main": mem_main, "sub": mem_sub},
-            {"key": "SSD", "main": ssd_main, "sub": ""},
+            {"key": "SSD", "main": ssd_main, "sub": "", "detail": ssd_detail},
             {"key": "OS", "main": os_main, "sub": ""},
         ],
         "games": parse_game_fps(src) if src else {},
@@ -1208,6 +1210,46 @@ def pop_sheet(d: dict, src: str = "") -> dict:
         "weight": weight.group(1) if weight else "",
         "warranty": f"持込修理保証: {warranty}" if warranty else "",
     }
+
+
+# ---------------------------------------------------------------- カスタマイズ (商品ページの選択肢と追加金額)
+
+CUSTOM_CATEGORIES = ["オフィスソフト", "メモリ", "CPUファン", "CPUグリス", "電源", "SSD", "無線LAN"]
+_CUSTOM_INPUT = re.compile(r'<input\b[^>]*class="c-check__input basic-config-(true|false)[^"]*"[^>]*>', re.S)
+
+
+def parse_customize(src: str, categories: list[str] = CUSTOM_CATEGORIES) -> dict:
+    """カスタマイズの選択肢 → {"メモリ": [{"label": "32GB (16GB×2) (DDR5-4800)", "price": 28050, "base": False}, ...], ...}
+
+    price は標準構成からの追加金額 (税込)。base は標準 (初期選択) の選択肢。
+    """
+    out: dict[str, list] = {}
+    for m in _CUSTOM_INPUT.finditer(src):
+        tag = m.group(0)
+        name = html.unescape(_first(r'\bname="([^"]*)"', tag) or "")
+        if name not in categories:
+            continue
+        rest = src[m.end(): m.end() + 3000]
+        nxt = _CUSTOM_INPUT.search(rest)
+        if nxt:
+            rest = rest[:nxt.start()]
+        label = _first(r'<input\b[^>]*class="hidden_input"[^>]*\bname="([^"]*)"', rest)
+        if label:
+            label = html.unescape(label)
+        else:
+            t = _first(r'customize__select__text">(.*?)</span>', rest)
+            label = _text(t).split("\n")[0] if t else ""
+        label = re.split(r"(?i)<br\s*/?>|\n", label)[0]            # 2行目以降 (※注記) は使わない
+        label = re.sub(r"\s+", " ", label).strip()
+        pop = re.sub(r"《[^》]*》|\[納期[^\]]*\]", "", label).strip()  # POP 用: キャンペーン表記・納期を除く
+        try:
+            price = int(round(float(_first(r'\bvalue="([^"]*)"', tag) or 0)))
+        except ValueError:
+            price = 0
+        if not label:
+            continue
+        out.setdefault(name, []).append({"label": label, "pop": pop, "price": price, "base": m.group(1) == "true"})
+    return {k: out[k] for k in categories if k in out}
 
 
 def _short_value(label: str, pj: dict, full: str) -> str:

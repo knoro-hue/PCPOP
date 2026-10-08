@@ -417,5 +417,28 @@ class TestPortVariants(unittest.TestCase):
         self.assertEqual(p["rows"]["3.2 Gen2 Type-C"], [0, 1])
 
 
+class TestCustomize(unittest.TestCase):
+    """商品ページのカスタマイズ選択肢 (実ページ MC25585-SN5037 の選択肢)。"""
+
+    def setUp(self):
+        self.c = scraper.parse_product(FIX.read_text(encoding="utf-8"), "x")["customize"]
+
+    def test_categories(self):
+        self.assertEqual(list(self.c), ["オフィスソフト", "メモリ", "CPUファン", "CPUグリス", "電源", "SSD", "無線LAN"])
+        for opts in self.c.values():
+            self.assertEqual(sum(o["base"] for o in opts), 1)   # 標準はひとつ
+            self.assertEqual(next(o for o in opts if o["base"])["price"], 0)
+
+    def test_options(self):
+        mem = {o["pop"]: o["price"] for o in self.c["メモリ"]}
+        self.assertEqual(mem["32GB (16GB×2) (DDR5-4800)"], 28050)        # 《キャンペーン》表記は POP 用から除く
+        self.assertEqual(self.c["メモリ"][0]["label"], "16GB (16GB×1) (DDR5-4800)")
+        office = [o["pop"] for o in self.c["オフィスソフト"]]
+        self.assertIn("Microsoft 365 Personal (24か月版)", office)        # 2行目の ※注記 は含めない
+        self.assertEqual({o["pop"]: o["price"] for o in self.c["無線LAN"]}["Wi-Fi 6+Bluetooth(R)5.2対応 無線LAN"], 4000)
+        ssd = {o["pop"]: o["price"] for o in self.c["SSD"]}
+        self.assertEqual(ssd["2TB SSD (M.2 NVMe Gen4)"], 29000)
+
+
 if __name__ == "__main__":
     unittest.main()

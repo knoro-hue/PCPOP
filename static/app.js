@@ -40,7 +40,9 @@ async function load(path, body) {
   try {
     const d = await call(path, body);
     await assetsReady;
-    render(d);
+    base = d; custom = {}; imgSel = 0;
+    buildCustomPanel(d);
+    render(applyCustom(d));
     const w = d.warnings.length ? "\n⚠ " + d.warnings.join("\n⚠ ") : "";
     setStatus(`取得完了: ${d.productId || ""}  仕様${d.specTable.length}項目 / 画像${d.images.length}枚${w}`,
       d.warnings.length ? "err" : "ok");
@@ -122,7 +124,10 @@ const assetImg = (src, cls) => el("img", { class: cls, src, alt: "" });
 // 縦書き風ラベル (1文字ずつ縦に並べる)
 const vlbl = (t) => el("div", { class: "vlbl" }, ...[...t].map((ch) => el("span", { text: ch })));
 const GAME_TEMPLATE = ["Apex Legends", "Valorant", "Monster Hunter Wilds", "Cyberpunk 2077"];
-let data = null;
+let data = null;     // POP に出しているデータ (カスタマイズ反映後)
+let base = null;     // 取得したままのデータ
+let custom = {};     // カスタマイズ: {カテゴリ: 選択肢の番号}
+let imgSel = 0;      // 選んだPC画像
 let gamesMode = "fps";
 
 // data フォルダの fps データ (MC番号ごと) → 表。ゲーム・画質・解像度は左パネルで選ぶ
@@ -217,7 +222,7 @@ function render(d) {
       el("div", { class: "s-model-top" }, el("span", { text: "Model Name" }), ed("span", "mc", note ? s.pid : s.mc)),
       ed("div", "s-code", s.code)));
 
-  const img = el("img", { id: "popImg", src: d.images[0] || "", alt: "" });
+  const img = el("img", { id: "popImg", src: d.images[imgSel] || d.images[0] || "", alt: "" });
 
   // 価格
   const inst = d.installment;
@@ -230,7 +235,7 @@ function render(d) {
 
   // 分割手数料0円バナー
   const bannerFile = asset("banner_credit");
-  const banner = bannerFile ? el("div", { class: "s-banner img opt-banner" }, assetImg(bannerFile, "")) : el("div", { class: "s-banner opt-banner" },
+  const banner = d.customBox?.length ? customBox(d.customBox) : bannerFile ? el("div", { class: "s-banner img opt-banner" }, assetImg(bannerFile, "")) : el("div", { class: "s-banner opt-banner" },
     el("div", { class: "card" }, ed("b", "", "三井住友カード"), ed("span", "", "ショッピングクレジット")),
     el("div", { class: "msg" },
       el("div", { class: "max" }, el("span", { class: "flag", text: "最大" }), ed("b", "", String(inst?.count || 36)), el("span", { text: "回まで" })),
@@ -319,7 +324,7 @@ function noteBody(d, img) {
   const line = (key, main, sub, brand) => el("div", { class: "n-row" },
     el("div", { class: "lg" }, specLogo(key, main, brand)),
     el("div", { class: "tx" }, ed("div", "m", main), sub ? ed("div", "s", sub) : null));
-  const ssdSub = (d.keySpecs.find((k) => k.label === "SSD")?.display.match(/\(([^)]*)\)\s*$/) || [])[1] || "";
+  const ssdSub = b.SSD.detail || "";
   const box = el("div", { class: "n-box" },
     line("CPU", b.CPU.main, b.CPU.sub, b.CPU.brand),
     line("GPU", n.gpu.main, n.gpu.sub, b.GPU.brand),
@@ -373,8 +378,9 @@ function buildPanel(d) {
   const thumbs = $("#thumbs");
   thumbs.replaceChildren();
   d.images.forEach((u, i) => {
-    const t = el("img", { src: u, loading: "lazy", class: i === 0 ? "sel" : "" });
+    const t = el("img", { src: u, loading: "lazy", class: i === imgSel ? "sel" : "" });
     t.onclick = () => {
+      imgSel = i;
       $("#popImg").src = u;
       thumbs.querySelectorAll("img").forEach((x) => x.classList.toggle("sel", x === t));
     };
@@ -398,6 +404,92 @@ $("#btnGamesFps").onclick = () => setGames("fps");
 $("#fpsQuality").onchange = () => setGames("fps");
 document.querySelectorAll("#fpsRes input").forEach((cb) => (cb.onchange = () => setGames("fps")));
 $("#btnGamesMark").onclick = () => setGames("mark");
+
+/* ------------------------------------------------------------ カスタマイズ */
+// 商品ページのカスタマイズ選択肢から選ぶ → 合計金額・スペック表記に反映。
+// メモリ・SSD はスペック欄に、それ以外 (Office・CPUファン・グリス・電源・無線LAN) は下のバナーの代わりの枠に出す
+const SPEC_CUSTOM = ["メモリ", "SSD"];
+const CUSTOM_LABEL = { "オフィスソフト": "Office" };
+
+function splitMemory(t) {  // "32GB (16GB×2) (DDR5-4800)" → ["32GB", "(16GB×2) (DDR5-4800)"]
+  const m = t.match(/^(\S+)\s*(.*)$/);
+  return m ? [m[1], m[2]] : [t, ""];
+}
+function splitSsd(t) {     // "2TB SSD (M.2 NVMe Gen4) WD SN850X (読込速度 …)" → ["2TB SSD", "M.2 NVMe Gen4 WD SN850X"]
+  const s = t.replace(/\s*\((?:読込|読み込み)速度[^)]*\)/, "").trim();
+  const m = s.match(/^(\S+\s*SSD)\s*(.*)$/i) || s.match(/^(\S+)\s*(.*)$/);
+  return m ? [m[1], m[2].replace(/^\(([^)]*)\)/, "$1").trim()] : [s, ""];
+}
+function wifiOf(t) {       // "Wi-Fi 6+Bluetooth(R)5.2対応 無線LAN" → {main: "6 対応", sub: "(Bluetooth 5.2)"}
+  const w = t.match(/Wi-?Fi\s*(\d+E?)/i), b = t.match(/Bluetooth(?:\(R\))?\s*([\d.]+)/i);
+  return w ? { main: `${w[1]} 対応`, sub: b ? `(Bluetooth ${b[1]})` : "" } : { main: "搭載", sub: "" };
+}
+
+function applyCustom(orig) {
+  const d = structuredClone(orig);
+  const picks = Object.keys(orig.customize || {}).filter((cat) => cat in custom)  // 並びは商品ページの順
+    .map((cat) => ({ cat, opt: orig.customize[cat][custom[cat]] }))
+    .filter((x) => x.opt && !x.opt.base);
+  const add = picks.reduce((a, x) => a + x.opt.price, 0);
+  if (add && orig.price) {
+    d.price = orig.price + add;
+    // 月々の分割額は 元の月々 × (合計 / 元の価格) を100円単位に (目安。POP上で修正可)
+    if (orig.installment?.monthly) d.installment.monthly = Math.round(orig.installment.monthly * d.price / orig.price / 100) * 100;
+  }
+  const b = Object.fromEntries(d.sheet.basic.map((x) => [x.key, x]));
+  for (const { cat, opt } of picks) {
+    if (cat === "メモリ") [b["メモリ"].main, b["メモリ"].sub] = splitMemory(opt.pop);
+    if (cat === "SSD") {
+      [b.SSD.main, b.SSD.detail] = splitSsd(opt.pop);
+      b.SSD.sub = b.SSD.detail;
+    }
+    if (cat === "無線LAN") {
+      d.sheet.wifi = wifiOf(opt.pop);
+      if (d.sheet.note) d.sheet.note.wifi = wifiOf(opt.pop);
+    }
+  }
+  d.customBox = picks.filter((x) => !SPEC_CUSTOM.includes(x.cat)).map((x) => ({ k: CUSTOM_LABEL[x.cat] || x.cat, v: x.opt.pop }));
+  d.customAdd = add;
+  return d;
+}
+
+function customBox(items) {
+  return el("div", { class: "s-custom opt-banner" + (items.length > 3 ? " two" : "") },
+    el("div", { class: "bar", text: "カスタマイズ内容" }),
+    el("div", { class: "items" }, ...items.map((x) => el("div", { class: "it" }, el("div", { class: "k", text: x.k }), ed("div", "v", x.v)))));
+}
+
+function buildCustomPanel(d) {
+  const box = $("#customSel");
+  const cats = Object.keys(d.customize || {});
+  $("#customBox").hidden = !cats.length;
+  box.replaceChildren(...cats.map((cat) => {
+    const sel = el("select", { class: "wide-sel" });
+    d.customize[cat].forEach((o, i) => {
+      const op = el("option", { value: String(i), text: `${o.label}${o.base ? "（標準）" : `（+${yen(o.price)}円）`}` });
+      if (o.base) op.selected = true;
+      sel.append(op);
+    });
+    sel.onchange = () => { custom[cat] = Number(sel.value); updateCustom(); };
+    return el("label", { class: "cust" }, el("span", { class: "lbl", text: CUSTOM_LABEL[cat] || cat }), sel);
+  }));
+  updateCustomSum();
+}
+function updateCustomSum() {
+  const d = applyCustom(base);
+  $("#customSum").textContent = d.customAdd
+    ? `カスタマイズ +${yen(d.customAdd)}円 → 合計 ${yen(d.price)}円（税込）`
+    : "標準構成のままです";
+}
+function updateCustom() {
+  updateCustomSum();
+  render(applyCustom(base));
+}
+$("#btnCustomReset").onclick = () => {
+  custom = {};
+  buildCustomPanel(base);
+  render(applyCustom(base));
+};
 
 const OPTS = {
   optGames: ".opt-games", optPorts: ".opt-ports", optInstall: ".opt-install", optSpec: ".opt-spec",
