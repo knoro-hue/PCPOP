@@ -440,5 +440,23 @@ class TestCustomize(unittest.TestCase):
         self.assertEqual(ssd["2TB SSD (M.2 NVMe Gen4)"], 29000)
 
 
+class TestModelName(unittest.TestCase):
+    """型番・型番の後ろの説明・シリーズ名 (コラボ等は GSL-Series)。"""
+
+    def sheet(self, name):
+        return scraper.pop_sheet({"model": name, "productId": "MC1-SN1", "specTable": [], "keySpecs": []})
+
+    def test_collab_is_gsl(self):
+        s = self.sheet("GALLERIA KNDR7A-R58-W Ryzen 7 9800X3D搭載 カグラナナ コラボモデル")
+        self.assertEqual((s["series"], s["code"], s["codeSub"]),
+                         ("GSL-Series", "KNDR7A-R58-W", "Ryzen 7 9800X3D搭載 カグラナナ コラボモデル"))
+        for word in ["推奨", "動作確認済み", "大会", "協賛", "公認", "監修"]:
+            self.assertEqual(self.sheet(f"GALLERIA XA7C-R57 タイトル{word}モデル")["series"], "GSL-Series", word)
+
+    def test_normal_model(self):
+        s = self.sheet("GALLERIA XPR7A-R57-GD Ryzen 7 7700/LEDファン標準搭載モデル")
+        self.assertEqual((s["series"], s["codeSub"]), ("X-Series", "Ryzen 7 7700/LEDファン標準搭載モデル"))
+
+
 if __name__ == "__main__":
     unittest.main()

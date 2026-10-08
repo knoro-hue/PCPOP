@@ -23,7 +23,7 @@
 }
 .s-logo .em svg { width: 9mm; height: 9mm; display: block; }
 .s-logo .t { font: 800 italic 7.4mm/1 "Poppins", sans-serif; letter-spacing: .02em; }
-.s-series { font-family: var(--cond); font-weight: bold; font-stretch: condensed; font-size: 13mm; line-height: 1.05; margin-top: 1.5mm; white-space: nowrap; }
+.s-series { font-family: var(--cond); font-weight: bold; font-stretch: condensed; font-size: 13mm; line-height: 1.05; margin-top: 1.5mm; white-space: nowrap; overflow: hidden; }
 .s-model { flex: 1; min-width: 0; }
 .s-model-top { display: flex; justify-content: space-between; font-size: 3.6mm; line-height: 1; }
 .s-model-top .mc { font-size: 3.2mm; }
@@ -223,3 +223,7 @@
 .s-custom .k { width: 20mm; flex-shrink: 0; align-self: stretch; display: flex; align-items: center; justify-content: center; background: #eee; font-size: 3mm; }
 .s-custom .v { flex: 1; min-width: 0; padding: .6mm 2mm; font-size: 3.3mm; line-height: 1.3; }
 .s-custom.two .v { font-size: 2.8mm; }
+
+/* 型番の後ろの説明 (例: Ryzen 7 9800X3D搭載 カグラナナ コラボモデル) */
+.s-code-sub { font-size: 3.6mm; line-height: 1.2; text-align: right; white-space: nowrap; overflow: hidden; margin: -.5mm 0 .4mm; }
+.s-model:has(.s-code-sub) .s-code { line-height: 1.05; }

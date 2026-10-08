@@ -1139,6 +1139,10 @@ def _note_info(t: dict, get, gpu_main: str, gpu_sub: str, mc: str) -> dict | Non
     }
 
 
+# モデル名にこれらの言葉があれば GSL-Series (ゲーム・配信者・大会などとのコラボ／推奨モデル)
+GSL_WORDS = r"コラボ|推奨|動作確認済|大会|協賛|公認|監修"
+
+
 def pop_sheet(d: dict, src: str = "") -> dict:
     """店頭POP (基本構成・ゲーム性能・端子・仕様) 用に商品データを整形する。"""
     t = {r["label"]: r["value"] for r in d.get("specTable", [])}
@@ -1150,6 +1154,11 @@ def pop_sheet(d: dict, src: str = "") -> dict:
     brand = m.group(1).upper() if m else ""
     code = m.group(2) if m else (model.split(" ")[0] if model else "")
     series = f"{code[0].upper()}-Series" if brand == "GALLERIA" and code[:1].isalpha() else ""
+    # 型番の後ろの説明 (例: "Ryzen 7 9800X3D搭載 カグラナナ コラボモデル")。型番の下に小さく出す
+    code_sub = model[m.end():].strip() if m else model[len(code):].strip()
+    # コラボ・推奨・大会などのモデルは GSL-Series
+    if brand == "GALLERIA" and re.search(GSL_WORDS, model):
+        series = "GSL-Series"
 
     gpu_main, gpu_sub = _paren_split(get("GPU", "グラフィック機能", "グラフィックボード"))
     gpu_main = re.sub(r"\s*GDDR\d+X?\b", "", re.sub(r"^NVIDIA\s+", "", gpu_main)).strip()
@@ -1191,6 +1200,7 @@ def pop_sheet(d: dict, src: str = "") -> dict:
         "brand": brand or "GALLERIA",
         "series": series,
         "code": code,
+        "codeSub": code_sub,
         "mc": re.sub(r"-SN\d+$", "", d.get("productId") or ""),
         "pid": d.get("productId") or "",
         "basic": [

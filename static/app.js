@@ -220,7 +220,8 @@ function render(d) {
       s.series ? ed("div", "s-series", s.series) : null),
     el("div", { class: "s-model" },
       el("div", { class: "s-model-top" }, el("span", { text: "Model Name" }), ed("span", "mc", note ? s.pid : s.mc)),
-      ed("div", "s-code", s.code)));
+      ed("div", "s-code", s.code),
+      s.codeSub ? ed("div", "s-code-sub", s.codeSub) : null));  // 型番の後ろの説明 (小さく)
 
   const img = el("img", { id: "popImg", src: d.images[imgSel] || d.images[0] || "", alt: "" });
 
@@ -356,7 +357,9 @@ function fitText(node, maxMm, minMm) {
 }
 function fitSheet() {
   fitLayout();
-  fitText($(".s-code"), 24, 9);
+  fitText($(".s-code"), $(".s-code-sub") ? 21 : 24, 9);
+  fitText($(".s-code-sub"), 3.6, 2.2);
+  fitText($(".s-series"), 13, 7);  // GSL-Series など長いシリーズ名は小さく
   // 基本構成の値も1行に収める
   document.querySelectorAll(".s-basic .m").forEach((m) => fitText(m, 6.2, 3.6));
   document.querySelectorAll(".n-row .m").forEach((m) => fitText(m, 6, 3.6));
